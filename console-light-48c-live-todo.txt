@@ -1,0 +1,28 @@
+2026-11-20 03:02:04.220 Simpl[38989:105629] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-20 03:02:04.913 Simpl[38989:105629] [Simpl] window: the app's screens (no page)
+2026-11-20 03:02:05.278 Simpl[38989:105629] [Simpl] appear Calendar: 484 ms
+2026-11-20 03:02:05.440 Simpl[38989:105629] [Simpl] appear Calendar: 646 ms
+2026-11-20 03:02:07.989 Simpl[38989:105629] [Simpl] call quietColors: 2712 ms
+2026-11-20 03:02:07.999 Simpl[38989:105629] [Simpl] call calView: 2550 ms
+2026-11-20 03:02:08.009 Simpl[38989:105629] [Simpl] call calView: 2730 ms
+2026-11-20 03:02:08.168 Simpl[38989:105629] [Simpl] call snapshot: 422 ms
+2026-11-20 03:02:08.324 Simpl[38989:105629] [Simpl] call calendar: 314 ms
+2026-11-20 03:02:08.325 Simpl[38989:105629] [Simpl] call calendar: 319 ms
+2026-11-20 03:02:09.128 Simpl[38989:105629] [Simpl] calendar month: To Do beside the month
+2026-11-20 03:02:09.128 Simpl[38989:105629] [Simpl] calendar month: days 60 pt across, items as dots
+2026-11-20 03:02:09.129 Simpl[38989:105629] [Simpl] calendar head: two lines, its tools named: To Do, Sync, Calendars
+2026-11-20 03:02:09.469 Simpl[38989:105629] [Simpl] open Calendar: 4675 ms (fetched)
+2026-11-20 03:02:09.470 Simpl[38989:105629] [Simpl] live: calendar waits (loading)
+2026-11-20 03:02:09.508 Simpl[38989:105629] [Simpl] call courses: 1284 ms
+2026-11-20 03:02:09.773 Simpl[38989:105629] [Simpl] call todo: 304 ms
+2026-11-20 03:02:10.119 Simpl[38989:105629] [Simpl] call groups: 605 ms
+2026-11-20 03:02:11.058 Simpl[38989:105629] [Simpl] call moreFromCanvas: 939 ms
+2026-11-20 03:02:12.199 Simpl[38989:105629] [Simpl] live: calendar unchanged · 0 reads
+2026-11-20 03:02:13.099 Simpl[38989:105629] [Simpl] live: dev change task made (planner_note:note1)
+2026-11-20 03:02:14.134 Simpl[38989:105629] [Simpl] live: todo updated todo,sidebar · 8 reads
+2026-11-20 03:02:16.253 Simpl[38989:105629] [Simpl] live: calendar unchanged · 3 reads
+2026-11-20 03:02:18.043 Simpl[38989:105629] [Simpl] live: todo unchanged · 8 reads
+2026-11-20 03:02:20.419 Simpl[38989:105629] [Simpl] live: calendar unchanged · 3 reads
+2026-11-20 03:02:22.184 Simpl[38989:105629] [Simpl] live: todo unchanged · 8 reads
+2026-11-20 03:02:24.690 Simpl[38989:105629] [Simpl] live: calendar unchanged · 3 reads
+2026-11-20 03:02:26.246 Simpl[38989:105629] [Simpl] live: todo unchanged · 8 reads

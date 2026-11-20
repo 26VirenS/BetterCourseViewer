@@ -1,0 +1,12 @@
+2026-11-20 02:47:19.188 Simpl[13084:41009] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-20 02:47:20.111 Simpl[13084:41009] [Simpl] window: the app's screens (no page)
+2026-11-20 02:47:21.219 Simpl[13084:41009] [Simpl] popup tool: 984 × 607, 20 in from the window (sidebar out)
+2026-11-20 02:47:22.182 Simpl[13084:41009] [Simpl] bio launch: cell bacterium:gram+:select=wall on the bacterium page: scale teaching, cutaway on, explode 0.00, selected organelle:wall, quiz none
+2026-11-20 02:47:24.579 Simpl[13084:41009] [Simpl] popup tool: 984 × 588, 20 in from the window (sidebar out)
+2026-11-20 02:47:25.341 Simpl[13084:41009] [Simpl] call quietColors: 4590 ms
+2026-11-20 02:47:25.389 Simpl[13084:41009] [Simpl] call snapshot: 191 ms
+2026-11-20 02:47:25.591 Simpl[13084:41009] [Simpl] call courses: 180 ms
+2026-11-20 02:47:25.675 Simpl[13084:41009] [Simpl] bio scene: bacterium|false|true|true|0.0||-|false|false|- made in 3822 ms, 253 objects
+2026-11-20 02:47:25.731 Simpl[13084:41009] [Simpl] bio frame bacterium|false|true|true|0.0||-|false|false|-: view 570 × 357, model 46% across, 76% up
+2026-11-20 02:47:25.742 Simpl[13084:41009] [Simpl] call groups: 150 ms
+2026-11-20 02:47:29.771 Simpl[13084:41009] [Simpl] call moreFromCanvas: 4028 ms

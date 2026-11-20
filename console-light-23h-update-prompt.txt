@@ -1,0 +1,24 @@
+2026-11-20 02:57:09.794 Simpl[39139:105171] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-20 02:57:12.723 Simpl[39139:105171] [Simpl] window: the app's screens (no page)
+2026-11-20 02:57:13.450 Simpl[39139:105171] [Simpl] appear Dashboard: 1180 ms
+2026-11-20 02:57:14.226 Simpl[39139:105171] [Simpl] update: the prompt is up (1.3.300)
+2026-11-20 02:57:15.605 Simpl[39139:105171] [Simpl] appear Dashboard: 3335 ms
+2026-11-20 02:57:21.766 Simpl[39139:105171] [Simpl] popup forceupdate: 400 × 255
+2026-11-20 02:57:25.880 Simpl[39139:105171] [Simpl] open Dashboard: 13610 ms (kept)
+2026-11-20 02:57:27.515 Simpl[39139:105171] [Simpl] call quietColors: 14067 ms
+2026-11-20 02:57:27.530 Simpl[39139:105171] [Simpl] call dashList: 5756 ms
+2026-11-20 02:57:27.531 Simpl[39139:105171] [Simpl] call dashList: 5927 ms
+2026-11-20 02:57:27.533 Simpl[39139:105171] [Simpl] call today: 5120 ms
+2026-11-20 02:57:27.540 Simpl[39139:105171] [Simpl] call today: 5128 ms
+2026-11-20 02:57:27.660 Simpl[39139:105171] [Simpl] open Dashboard: 15390 ms (live)
+2026-11-20 02:57:27.664 Simpl[39139:105171] [Simpl] call todayCounts: 1857 ms
+2026-11-20 02:57:27.664 Simpl[39139:105171] [Simpl] call todayCounts: 1858 ms
+2026-11-20 02:57:27.665 Simpl[39139:105171] [Simpl] call todayCounts: 1858 ms
+2026-11-20 02:57:27.665 Simpl[39139:105171] [Simpl] call todayCounts: 1858 ms
+2026-11-20 02:57:27.666 Simpl[39139:105171] [Simpl] call dashSkyline: 6139 ms
+2026-11-20 02:57:27.666 Simpl[39139:105171] [Simpl] call dashSkyline: 5893 ms
+2026-11-20 02:57:27.667 Simpl[39139:105171] [Simpl] call snapshot: 843 ms
+2026-11-20 02:57:28.750 Simpl[39139:105171] [Simpl] call courses: 698 ms
+2026-11-20 02:57:29.039 Simpl[39139:105171] [Simpl] call groups: 288 ms
+2026-11-20 02:57:29.871 Simpl[39139:105171] [Simpl] call moreFromCanvas: 832 ms
+2026-11-20 02:57:33.290 Simpl[39139:105171] [Simpl] shot: another copy of the app is in front; brought forward again

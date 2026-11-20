@@ -1,0 +1,18 @@
+2026-11-20 02:46:13.069 Simpl[10278:33861] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-20 02:46:14.688 Simpl[10278:33861] [Simpl] window: the app's screens (no page)
+2026-11-20 02:46:16.014 Simpl[10278:33861] [Simpl] appear Calendar: 1546 ms
+2026-11-20 02:46:17.043 Simpl[10278:33861] [Simpl] appear Calendar: 2574 ms
+2026-11-20 02:46:20.156 Simpl[10278:33861] [Simpl] call quietColors: 4145 ms
+2026-11-20 02:46:20.158 Simpl[10278:33861] [Simpl] call calView: 3115 ms
+2026-11-20 02:46:20.182 Simpl[10278:33861] [Simpl] call calView: 4165 ms
+2026-11-20 02:46:20.210 Simpl[10278:33861] [Simpl] call snapshot: 305 ms
+2026-11-20 02:46:20.740 Simpl[10278:33861] [Simpl] call calendar: 557 ms
+2026-11-20 02:46:20.761 Simpl[10278:33861] [Simpl] call calendar: 580 ms
+2026-11-20 02:46:23.048 Simpl[10278:33861] [Simpl] calendar month: To Do put away, to give the days room
+2026-11-20 02:46:23.048 Simpl[10278:33861] [Simpl] calendar month: days 99 pt across, items by name
+2026-11-20 02:46:23.048 Simpl[10278:33861] [Simpl] calendar head: two lines, its tools named: To Do, Sync, Calendars
+2026-11-20 02:46:23.488 Simpl[10278:33861] [Simpl] call courses: 3108 ms
+2026-11-20 02:46:23.491 Simpl[10278:33861] [Simpl] open Calendar: 9021 ms (fetched)
+2026-11-20 02:46:23.889 Simpl[10278:33861] [Simpl] call groups: 400 ms
+2026-11-20 02:46:25.234 Simpl[10278:33861] [Simpl] call moreFromCanvas: 1344 ms
+2026-11-20 02:46:27.593 Simpl[10278:33861] [Simpl] shot: another copy of the app is in front; brought forward again

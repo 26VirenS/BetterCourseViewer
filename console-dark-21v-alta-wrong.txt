@@ -1,0 +1,27 @@
+2026-11-20 02:52:54.606 Simpl[22736:65328] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-20 02:52:55.809 Simpl[22736:65328] [Simpl] window: the app's screens (no page)
+2026-11-20 02:52:56.445 Simpl[22736:65328] [Simpl] appear Dashboard: 773 ms
+2026-11-20 02:52:56.860 Simpl[22736:65328] [Simpl] appear Dashboard: 1189 ms
+2026-11-20 02:53:01.080 Simpl[22736:65328] [Simpl] open Dashboard: 5406 ms (kept)
+2026-11-20 02:53:02.182 Simpl[22736:65328] [Simpl] popup alta: 984 × 591, 20 in from the window (sidebar out)
+2026-11-20 02:53:03.841 Simpl[22736:65328] [Simpl] popup alta: 984 × 589, 20 in from the window (sidebar out)
+2026-11-20 02:53:04.611 Simpl[22736:65328] [Simpl] popup alta: 984 × 591, 20 in from the window (sidebar out)
+2026-11-20 02:53:04.695 Simpl[22736:65328] [Simpl] call quietColors: 8252 ms
+2026-11-20 02:53:04.702 Simpl[22736:65328] [Simpl] call today: 4772 ms
+2026-11-20 02:53:04.711 Simpl[22736:65328] [Simpl] call today: 4781 ms
+2026-11-20 02:53:04.714 Simpl[22736:65328] [Simpl] call dashSkyline: 4911 ms
+2026-11-20 02:53:04.716 Simpl[22736:65328] [Simpl] call dashSkyline: 4915 ms
+2026-11-20 02:53:04.717 Simpl[22736:65328] [Simpl] call dashList: 4915 ms
+2026-11-20 02:53:04.719 Simpl[22736:65328] [Simpl] call dashList: 4917 ms
+2026-11-20 02:53:04.978 Simpl[22736:65328] [Simpl] alta: view made 6 ms · asked 655 ms · page given · page 3421 ms · question 3599 ms · shown 3602 ms (question, quiet 175 ms, 175 ms after DOMContentLoaded)
+2026-11-20 02:53:04.990 Simpl[22736:65328] [Simpl] call todayCounts: 3922 ms
+2026-11-20 02:53:04.990 Simpl[22736:65328] [Simpl] call todayCounts: 3922 ms
+2026-11-20 02:53:04.990 Simpl[22736:65328] [Simpl] call todayCounts: 3922 ms
+2026-11-20 02:53:04.990 Simpl[22736:65328] [Simpl] call todayCounts: 3922 ms
+2026-11-20 02:53:04.990 Simpl[22736:65328] [Simpl] call snapshot: 3057 ms
+2026-11-20 02:53:05.055 Simpl[22736:65328] [Simpl] open Dashboard: 9379 ms (live)
+2026-11-20 02:53:05.566 Simpl[22736:65328] [Simpl] call assignment: 874 ms
+2026-11-20 02:53:06.297 Simpl[22736:65328] [Simpl] call courses: 1239 ms
+2026-11-20 02:53:07.157 Simpl[22736:65328] [Simpl] call groups: 859 ms
+2026-11-20 02:53:08.626 Simpl[22736:65328] [Simpl] call moreFromCanvas: 1467 ms
+2026-11-20 02:53:22.319 Simpl[22736:65328] [Simpl] shot: another copy of the app is in front; brought forward again

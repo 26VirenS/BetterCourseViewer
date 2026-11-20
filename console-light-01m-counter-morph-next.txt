@@ -1,0 +1,24 @@
+2026-11-20 02:58:19.255 Simpl[31584:86297] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-20 02:58:21.385 Simpl[31584:86297] [Simpl] window: the app's screens (no page)
+2026-11-20 02:58:22.152 Simpl[31584:86297] [Simpl] appear Dashboard: 1192 ms
+2026-11-20 02:58:22.690 Simpl[31584:86297] [Simpl] appear Dashboard: 1730 ms
+2026-11-20 02:58:29.969 Simpl[31584:86297] [Simpl] open Dashboard: 9009 ms (kept)
+2026-11-20 02:58:32.546 Simpl[31584:86297] [Simpl] call quietColors: 10395 ms
+2026-11-20 02:58:32.547 Simpl[31584:86297] [Simpl] call dashList: 5518 ms
+2026-11-20 02:58:32.556 Simpl[31584:86297] [Simpl] call dashList: 5525 ms
+2026-11-20 02:58:32.557 Simpl[31584:86297] [Simpl] call todayCounts: 2610 ms
+2026-11-20 02:58:32.557 Simpl[31584:86297] [Simpl] call todayCounts: 2611 ms
+2026-11-20 02:58:32.557 Simpl[31584:86297] [Simpl] call todayCounts: 2611 ms
+2026-11-20 02:58:32.557 Simpl[31584:86297] [Simpl] call todayCounts: 2611 ms
+2026-11-20 02:58:32.558 Simpl[31584:86297] [Simpl] call today: 4988 ms
+2026-11-20 02:58:32.558 Simpl[31584:86297] [Simpl] call today: 4989 ms
+2026-11-20 02:58:32.561 Simpl[31584:86297] [Simpl] call dashSkyline: 5530 ms
+2026-11-20 02:58:32.561 Simpl[31584:86297] [Simpl] call dashSkyline: 5540 ms
+2026-11-20 02:58:32.979 Simpl[31584:86297] [Simpl] counter: next grows, held 0.5 of the way
+2026-11-20 02:58:32.981 Simpl[31584:86297] [Simpl] open Dashboard: 12021 ms (live)
+2026-11-20 02:58:33.169 Simpl[31584:86297] [Simpl] counter: next grows, held 0.5 of the way
+2026-11-20 02:58:34.256 Simpl[31584:86297] [Simpl] call snapshot: 2523 ms
+2026-11-20 02:58:35.296 Simpl[31584:86297] [Simpl] call courses: 739 ms
+2026-11-20 02:58:35.963 Simpl[31584:86297] [Simpl] call todaySheet: 2545 ms
+2026-11-20 02:58:36.851 Simpl[31584:86297] [Simpl] call groups: 1550 ms
+2026-11-20 02:58:38.557 Simpl[31584:86297] [Simpl] call moreFromCanvas: 1706 ms

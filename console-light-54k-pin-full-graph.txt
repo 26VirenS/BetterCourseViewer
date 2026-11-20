@@ -1,0 +1,27 @@
+2026-11-20 02:53:44.306 Simpl[20113:56937] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-20 02:53:46.564 Simpl[20113:56937] [Simpl] window: the app's screens (no page)
+2026-11-20 02:53:47.249 Simpl[20113:56937] [Simpl] appear Dashboard: 928 ms
+2026-11-20 02:53:47.767 Simpl[20113:56937] [Simpl] appear Dashboard: 1445 ms
+2026-11-20 02:53:58.016 Simpl[20113:56937] [Simpl] open Dashboard: 11695 ms (kept)
+2026-11-20 02:53:59.382 Simpl[20113:56937] [Simpl] call quietColors: 12134 ms
+2026-11-20 02:53:59.388 Simpl[20113:56937] [Simpl] call dashList: 7778 ms
+2026-11-20 02:53:59.388 Simpl[20113:56937] [Simpl] call dashList: 7798 ms
+2026-11-20 02:53:59.658 Simpl[20113:56937] [Simpl] call today: 5602 ms
+2026-11-20 02:53:59.659 Simpl[20113:56937] [Simpl] call today: 5603 ms
+2026-11-20 02:53:59.660 Simpl[20113:56937] [Simpl] call todayCounts: 1664 ms
+2026-11-20 02:53:59.661 Simpl[20113:56937] [Simpl] call todayCounts: 1668 ms
+2026-11-20 02:53:59.661 Simpl[20113:56937] [Simpl] call todayCounts: 1668 ms
+2026-11-20 02:53:59.664 Simpl[20113:56937] [Simpl] call dashSkyline: 8053 ms
+2026-11-20 02:53:59.745 Simpl[20113:56937] [Simpl] call dashSkyline: 8154 ms
+2026-11-20 02:53:59.745 Simpl[20113:56937] [Simpl] call todayCounts: 1750 ms
+2026-11-20 02:53:59.746 Simpl[20113:56937] [Simpl] call snapshot: 1436 ms
+2026-11-20 02:54:00.971 Simpl[20113:56937] [Simpl] open Dashboard: 14646 ms (live)
+2026-11-20 02:54:01.821 Simpl[20113:56937] [Simpl] graph: drew y=x^2 for the picture
+2026-11-20 02:54:01.822 Simpl[20113:56937] [Simpl] call courses: 1446 ms
+2026-11-20 02:54:02.419 Simpl[20113:56937] [Simpl] call groups: 597 ms
+2026-11-20 02:54:03.179 Simpl[20113:56937] [Simpl] call moreFromCanvas: 759 ms
+2026-11-20 02:54:06.606 Simpl[20113:56937] [Simpl] popup tool: 984 × 588, 20 in from the window (sidebar out)
+2026-11-20 02:54:07.295 Simpl[20113:56937] [Simpl] pin full screen: graph (carried: nothing)
+2026-11-20 02:54:08.643 Simpl[20113:56937] [Simpl] popup tool: 984 × 591, 20 in from the window (sidebar out)
+2026-11-20 02:54:08.860 Simpl[20113:56937] [Simpl] graph: the pin's graph read (463 characters)
+2026-11-20 02:54:14.306 Simpl[20113:56937] [Simpl] graph: the pin's graph put in the whole one

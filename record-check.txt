@@ -1,0 +1,8 @@
+ok   the tool window's recording began (developer mode)
+FAIL its first step was not saved whole (recorder: step 1 (0001 screenshot.jpg, 0001 data.json), 38510 bytes so far;recorder: step 2 (0002 page.html.gz, 0002 data.json), 39896 bytes so far;)
+FAIL not in its folder: 0001 page.html.gz
+ok   in its folder: 0001 screenshot.jpg
+ok   in its folder: 0001 data.json
+ok   in its folder: README.txt
+ok   in its folder: timeline.txt
+size 60 KB

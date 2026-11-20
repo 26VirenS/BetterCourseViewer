@@ -1,0 +1,26 @@
+2026-11-20 02:45:29.962 Simpl[8366:28815] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-20 02:45:32.331 Simpl[8366:28815] [Simpl] window: the app's screens (no page)
+2026-11-20 02:45:33.086 Simpl[8366:28815] [Simpl] appear Dashboard: 1158 ms
+2026-11-20 02:45:33.540 Simpl[8366:28815] [Simpl] appear Dashboard: 1611 ms
+2026-11-20 02:45:40.239 Simpl[8366:28815] [Simpl] open Dashboard: 8301 ms (kept)
+2026-11-20 02:45:42.798 Simpl[8366:28815] [Simpl] popup alta: 984 × 590, 20 in from the window (sidebar out)
+2026-11-20 02:45:46.072 Simpl[8366:28815] [Simpl] popup alta: 984 × 591, 20 in from the window (sidebar out)
+2026-11-20 02:45:46.365 Simpl[8366:28815] [Simpl] call quietColors: 13279 ms
+2026-11-20 02:45:46.365 Simpl[8366:28815] [Simpl] call toolLaunch: 312 ms
+2026-11-20 02:45:46.370 Simpl[8366:28815] [Simpl] call today: 9755 ms
+2026-11-20 02:45:46.370 Simpl[8366:28815] [Simpl] call today: 9757 ms
+2026-11-20 02:45:46.370 Simpl[8366:28815] [Simpl] call todayCounts: 6149 ms
+2026-11-20 02:45:46.370 Simpl[8366:28815] [Simpl] call todayCounts: 6150 ms
+2026-11-20 02:45:46.371 Simpl[8366:28815] [Simpl] call todayCounts: 6150 ms
+2026-11-20 02:45:46.371 Simpl[8366:28815] [Simpl] call todayCounts: 6151 ms
+2026-11-20 02:45:46.371 Simpl[8366:28815] [Simpl] call dashSkyline: 10137 ms
+2026-11-20 02:45:46.372 Simpl[8366:28815] [Simpl] call dashSkyline: 10141 ms
+2026-11-20 02:45:46.374 Simpl[8366:28815] [Simpl] call dashList: 10139 ms
+2026-11-20 02:45:46.374 Simpl[8366:28815] [Simpl] call dashList: 10142 ms
+2026-11-20 02:45:46.374 Simpl[8366:28815] [Simpl] call snapshot: 4530 ms
+2026-11-20 02:45:48.026 Simpl[8366:28815] [Simpl] open Dashboard: 16086 ms (live)
+2026-11-20 02:45:48.757 Simpl[8366:28815] [Simpl] call courses: 1900 ms
+2026-11-20 02:45:49.106 Simpl[8366:28815] [Simpl] call assignment: 1093 ms
+2026-11-20 02:45:49.138 Simpl[8366:28815] [Simpl] call groups: 381 ms
+2026-11-20 02:45:49.911 Simpl[8366:28815] [Simpl] alta: view made 206 ms · asked 5225 ms · launch 5538 ms · page 7752 ms · overview 8638 ms · shown 8639 ms (overview, quiet 872 ms, 886 ms after DOMContentLoaded)
+2026-11-20 02:45:51.924 Simpl[8366:28815] [Simpl] call moreFromCanvas: 2785 ms

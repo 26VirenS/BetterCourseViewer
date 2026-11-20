@@ -1,0 +1,25 @@
+2026-11-20 02:45:55.308 Simpl[2966:12705] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-20 02:45:55.970 Simpl[2966:12705] [Simpl] window: the app's screens (no page)
+2026-11-20 02:45:56.302 Simpl[2966:12705] [Simpl] appear Dashboard: 445 ms
+2026-11-20 02:45:56.706 Simpl[2966:12705] [Simpl] appear Dashboard: 849 ms
+2026-11-20 02:46:03.169 Simpl[2966:12705] [Simpl] open Dashboard: 7308 ms (kept)
+2026-11-20 02:46:04.140 Simpl[2966:12705] [Simpl] call quietColors: 7835 ms
+2026-11-20 02:46:04.142 Simpl[2966:12705] [Simpl] call dashList: 5165 ms
+2026-11-20 02:46:04.142 Simpl[2966:12705] [Simpl] call today: 5071 ms
+2026-11-20 02:46:04.143 Simpl[2966:12705] [Simpl] call dashList: 5168 ms
+2026-11-20 02:46:04.143 Simpl[2966:12705] [Simpl] call today: 5072 ms
+2026-11-20 02:46:04.143 Simpl[2966:12705] [Simpl] call todayCounts: 1000 ms
+2026-11-20 02:46:04.143 Simpl[2966:12705] [Simpl] call todayCounts: 1000 ms
+2026-11-20 02:46:04.143 Simpl[2966:12705] [Simpl] call todayCounts: 1000 ms
+2026-11-20 02:46:04.786 Simpl[2966:12705] [Simpl] call todayCounts: 1642 ms
+2026-11-20 02:46:04.786 Simpl[2966:12705] [Simpl] counter: next fades in (Reduce Motion)
+2026-11-20 02:46:04.787 Simpl[2966:12705] [Simpl] call snapshot: 1352 ms
+2026-11-20 02:46:05.526 Simpl[2966:12705] [Simpl] open Dashboard: 9664 ms (live)
+2026-11-20 02:46:05.526 Simpl[2966:12705] [Simpl] counter: next fades in (Reduce Motion)
+2026-11-20 02:46:10.761 Simpl[2966:12705] [Simpl] call dashSkyline: 11779 ms
+2026-11-20 02:46:10.764 Simpl[2966:12705] [Simpl] call dashSkyline: 11787 ms
+2026-11-20 02:46:10.770 Simpl[2966:12705] [Simpl] call todaySheet: 3960 ms
+2026-11-20 02:46:10.771 Simpl[2966:12705] [Simpl] call courses: 5245 ms
+2026-11-20 02:46:14.780 Simpl[2966:12705] [Simpl] call groups: 4009 ms
+2026-11-20 02:46:15.344 Simpl[2966:12705] [Simpl] call moreFromCanvas: 563 ms
+2026-11-20 02:46:18.730 Simpl[2966:12705] [Simpl] shot: the window came back empty; asked again (1)

@@ -1,0 +1,4 @@
+ok   the instructions' file link clicked: walk: file link http://localhost:8800/courses/101/files/f1?wrap=1, Quick Look checked
+ok   its file shown: Preview: 1 item, download.pdf (Simpl's preview window, not downloaded)
+ok   no app's Quick Look was left with nothing in it
+ok   the module's file shown: Preview: 1 item, download.pdf (Simpl's preview window, not downloaded)

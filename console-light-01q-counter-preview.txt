@@ -1,0 +1,25 @@
+2026-11-20 02:46:46.448 Simpl[7994:27215] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-20 02:46:48.804 Simpl[7994:27215] [Simpl] window: the app's screens (no page)
+2026-11-20 02:46:49.528 Simpl[7994:27215] [Simpl] appear Dashboard: 1025 ms
+2026-11-20 02:46:49.994 Simpl[7994:27215] [Simpl] appear Dashboard: 1491 ms
+2026-11-20 02:46:51.838 Simpl[7994:27215] [Simpl] open Dashboard: 3332 ms (kept)
+2026-11-20 02:46:52.205 Simpl[7994:27215] [Simpl] call quietColors: 2676 ms
+2026-11-20 02:46:52.270 Simpl[7994:27215] [Simpl] call dashList: 1168 ms
+2026-11-20 02:46:52.270 Simpl[7994:27215] [Simpl] call dashList: 1169 ms
+2026-11-20 02:46:52.370 Simpl[7994:27215] [Simpl] call today: 1175 ms
+2026-11-20 02:46:52.522 Simpl[7994:27215] [Simpl] call todayCounts: 709 ms
+2026-11-20 02:46:52.522 Simpl[7994:27215] [Simpl] call todayCounts: 709 ms
+2026-11-20 02:46:52.522 Simpl[7994:27215] [Simpl] call snapshot: 456 ms
+2026-11-20 02:46:53.667 Simpl[7994:27215] [Simpl] call today: 2460 ms
+2026-11-20 02:46:53.668 Simpl[7994:27215] [Simpl] call todayCounts: 1854 ms
+2026-11-20 02:46:53.668 Simpl[7994:27215] [Simpl] call todayCounts: 1854 ms
+2026-11-20 02:46:53.669 Simpl[7994:27215] [Simpl] call dashSkyline: 2566 ms
+2026-11-20 02:46:53.670 Simpl[7994:27215] [Simpl] call dashSkyline: 2568 ms
+2026-11-20 02:46:53.674 Simpl[7994:27215] [Simpl] open Dashboard: 5168 ms (live)
+2026-11-20 02:46:53.680 Simpl[7994:27215] [Simpl] counter: today fades in (Reduce Motion)
+2026-11-20 02:46:53.968 Simpl[7994:27215] [Simpl] counter: today fades in (Reduce Motion)
+2026-11-20 02:46:53.971 Simpl[7994:27215] [Simpl] call courses: 1306 ms
+2026-11-20 02:46:54.290 Simpl[7994:27215] [Simpl] call groups: 318 ms
+2026-11-20 02:46:54.533 Simpl[7994:27215] [Simpl] call todaySheet: 670 ms
+2026-11-20 02:46:55.053 Simpl[7994:27215] [Simpl] call moreFromCanvas: 763 ms
+2026-11-20 02:46:56.199 Simpl[7994:27215] [Simpl] call assignment: 128 ms

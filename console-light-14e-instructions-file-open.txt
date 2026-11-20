@@ -1,0 +1,44 @@
+2026-11-20 03:00:57.472 Simpl[36485:98321] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-20 03:00:58.787 Simpl[36485:98321] [Simpl] window: the app's screens (no page)
+2026-11-20 03:00:59.040 Simpl[36485:98321] [Simpl] appear Course home: 333 ms
+2026-11-20 03:00:59.289 Simpl[36485:98321] [Simpl] appear Course home: 582 ms
+2026-11-20 03:01:01.681 Simpl[36485:98321] [Simpl] open Course home: 2974 ms (kept)
+2026-11-20 03:01:02.044 Simpl[36485:98321] [Simpl] appear Assignment: 111 ms
+2026-11-20 03:01:02.671 Simpl[36485:98321] [Simpl] call quietColors: 3632 ms
+2026-11-20 03:01:02.673 Simpl[36485:98321] [Simpl] call snapshot: 739 ms
+2026-11-20 03:01:03.022 Simpl[36485:98321] [Simpl] call home: 2000 ms
+2026-11-20 03:01:03.023 Simpl[36485:98321] [Simpl] call home: 1999 ms
+2026-11-20 03:01:03.023 Simpl[36485:98321] [Simpl] call neighbours: 808 ms
+2026-11-20 03:01:03.023 Simpl[36485:98321] [Simpl] call home: 2102 ms
+2026-11-20 03:01:03.040 Simpl[36485:98321] [Simpl] call assignment: 489 ms
+2026-11-20 03:01:03.047 Simpl[36485:98321] SimplAssignment 4002: files 0, comments 0, steps Hand In, review 0, handIn 0, error -
+2026-11-20 03:01:03.282 Simpl[36485:98321] SimplMore group=Assignments | peer=2 classmates’ work to review · assigned Nov 21 at 9:00 AM | files=PDF, DOCX, PNG or JPG only | similarity=Turnitin checks it for copied work
+2026-11-20 03:01:03.662 Simpl[36485:98321] [Simpl] open Course home: 1729 ms (live)
+2026-11-20 03:01:03.663 Simpl[36485:98321] [Simpl] open Assignment: 1730 ms (fetched)
+2026-11-20 03:01:03.735 Simpl[36485:98321] [Simpl] call neighbours: 362 ms
+2026-11-20 03:01:03.736 Simpl[36485:98321] [Simpl] call courses: 986 ms
+2026-11-20 03:01:04.303 Simpl[36485:98321] [Simpl] call groups: 555 ms
+2026-11-20 03:01:04.588 Simpl[36485:98321] [Simpl] walk: filelink
+2026-11-20 03:01:04.941 Simpl[36485:98321] [Simpl] call moreFromCanvas: 636 ms
+2026-11-20 03:01:04.963 Simpl[36485:98321] [Simpl] call fileInfo: 141 ms
+2026-11-20 03:01:05.142 Simpl[36485:98321] SimplPreview: download.pdf in PDFKit (3 pages)
+2026-11-20 03:01:05.457 Simpl[36485:98321] [files] Preview: 1 item, download.pdf (Simpl's preview window, not downloaded)
+2026-11-20 03:01:05.467 Simpl[36485:98321] [Simpl] walk: file link http://localhost:8800/courses/101/files/f1?wrap=1, Quick Look checked
+2026-11-20 03:01:05.467 Simpl[36485:98321] [Simpl] walk: done
+IOServiceMatchingfailed for: AppleM2ScalerParavirtDriver
+2026-11-20 03:01:06.612 Simpl[36485:98321] [Simpl] read ahead todayCounts: 24 ms
+2026-11-20 03:01:06.613 Simpl[36485:98321] [Simpl] read ahead today: 25 ms
+2026-11-20 03:01:06.772 Simpl[36485:98321] [Simpl] read ahead dashSkyline: 19 ms
+2026-11-20 03:01:06.773 Simpl[36485:98321] [Simpl] read ahead dashList: 20 ms
+2026-11-20 03:01:06.906 Simpl[36485:98321] [Simpl] read ahead calView: 1 ms
+2026-11-20 03:01:06.912 Simpl[36485:98321] [Simpl] read ahead todo: 7 ms
+2026-11-20 03:01:06.963 Simpl[36485:98321] [Simpl] read ahead calendar: 54 ms
+2026-11-20 03:01:07.057 Simpl[36485:98321] [Simpl] read ahead grades: 15 ms
+2026-11-20 03:01:07.103 Simpl[36485:98321] [Simpl] read ahead notifications: 8 ms
+2026-11-20 03:01:07.207 Simpl[36485:98321] [Simpl] read ahead inbox: 14 ms
+2026-11-20 03:01:07.257 Simpl[36485:98321] [Simpl] read ahead allCourses: 12 ms
+2026-11-20 03:01:07.348 Simpl[36485:98321] [Simpl] read ahead coursesProgress: 6 ms
+2026-11-20 03:01:07.394 Simpl[36485:98321] [Simpl] read ahead home: 12 ms
+2026-11-20 03:01:07.485 Simpl[36485:98321] [Simpl] read ahead home: 15 ms
+2026-11-20 03:01:07.542 Simpl[36485:98321] [Simpl] read ahead home: 8 ms
+2026-11-20 03:01:07.637 Simpl[36485:98321] [Simpl] read ahead home: 12 ms

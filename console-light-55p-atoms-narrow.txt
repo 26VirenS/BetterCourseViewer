@@ -1,0 +1,14 @@
+2026-11-20 02:55:20.614 Simpl[23782:66213] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-20 02:55:24.380 Simpl[23782:66213] [Simpl] window: the app's screens (no page)
+2026-11-20 02:55:27.702 Simpl[23782:66213] [Simpl] popup tool: 984 × 609, 20 in from the window (sidebar out)
+2026-11-20 02:55:32.260 Simpl[23782:66213] [Simpl] atom frame 8-orbitals-2p: view 570 × 418, model 84% across, 34% up
+2026-11-20 02:55:36.898 Simpl[23782:66213] [Simpl] popup tool: 740 × 591, 20 in from the window (sidebar away)
+2026-11-20 02:55:37.248 Simpl[23782:66213] [Simpl] atom frame 8-orbitals-2p: view 660 × 230, model 84% across, 65% up
+2026-11-20 02:55:37.433 Simpl[23782:66213] [Simpl] atom frame 8-orbitals-2p: view 643 × 230, model 84% across, 63% up
+2026-11-20 02:55:43.006 Simpl[23782:66213] [Simpl] popup tool: 740 × 589, 20 in from the window (sidebar away)
+2026-11-20 02:55:43.261 Simpl[23782:66213] [Simpl] atom frame 8-orbitals-2p: view 643 × 228, model 84% across, 64% up
+2026-11-20 02:55:48.073 Simpl[23782:66213] [Simpl] call quietColors: 21661 ms
+2026-11-20 02:55:48.220 Simpl[23782:66213] [Simpl] call snapshot: 406 ms
+2026-11-20 02:55:49.254 Simpl[23782:66213] [Simpl] call courses: 978 ms
+2026-11-20 02:55:49.581 Simpl[23782:66213] [Simpl] call groups: 327 ms
+2026-11-20 02:55:50.612 Simpl[23782:66213] [Simpl] call moreFromCanvas: 1029 ms

@@ -1,0 +1,24 @@
+2026-11-20 02:56:39.498 Simpl[32795:90941] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-20 02:56:41.833 Simpl[32795:90941] [Simpl] window: the app's screens (no page)
+2026-11-20 02:56:43.754 Simpl[32795:90941] [Simpl] appear Dashboard: 2069 ms
+2026-11-20 02:56:44.485 Simpl[32795:90941] [Simpl] appear Dashboard: 2800 ms
+2026-11-20 02:56:49.940 Simpl[32795:90941] [Simpl] open Dashboard: 8252 ms (kept)
+2026-11-20 02:56:52.713 Simpl[32795:90941] [Simpl] call snapshot: 175 ms
+2026-11-20 02:56:54.402 Simpl[32795:90941] [Simpl] call quietColors: 10654 ms
+2026-11-20 02:56:54.402 Simpl[32795:90941] [Simpl] call todayCounts: 4462 ms
+2026-11-20 02:56:54.402 Simpl[32795:90941] [Simpl] call todayCounts: 4462 ms
+2026-11-20 02:56:54.403 Simpl[32795:90941] [Simpl] call todayCounts: 4462 ms
+2026-11-20 02:56:54.403 Simpl[32795:90941] [Simpl] call today: 6366 ms
+2026-11-20 02:56:54.480 Simpl[32795:90941] [Simpl] call dashList: 6878 ms
+2026-11-20 02:56:54.481 Simpl[32795:90941] [Simpl] call dashList: 6880 ms
+2026-11-20 02:56:54.482 Simpl[32795:90941] [Simpl] call today: 6445 ms
+2026-11-20 02:56:54.482 Simpl[32795:90941] [Simpl] call dashSkyline: 6880 ms
+2026-11-20 02:56:54.483 Simpl[32795:90941] [Simpl] call todayCounts: 4542 ms
+2026-11-20 02:56:54.483 Simpl[32795:90941] [Simpl] call dashSkyline: 6882 ms
+2026-11-20 02:56:54.485 Simpl[32795:90941] [Simpl] open Dashboard: 12795 ms (live)
+2026-11-20 02:56:54.774 Simpl[32795:90941] [Simpl] counter: graded grows, held 0.4 of the way
+2026-11-20 02:56:54.849 Simpl[32795:90941] [Simpl] call courses: 1909 ms
+2026-11-20 02:56:55.361 Simpl[32795:90941] [Simpl] counter: graded grows, held 0.4 of the way
+2026-11-20 02:56:55.762 Simpl[32795:90941] [Simpl] call groups: 912 ms
+2026-11-20 02:56:56.812 Simpl[32795:90941] [Simpl] call todaySheet: 1061 ms
+2026-11-20 02:56:57.346 Simpl[32795:90941] [Simpl] call moreFromCanvas: 1583 ms

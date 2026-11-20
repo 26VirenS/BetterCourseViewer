@@ -1,0 +1,24 @@
+2026-11-20 02:47:59.459 Simpl[10769:34481] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-20 02:48:01.193 Simpl[10769:34481] [Simpl] window: the app's screens (no page)
+2026-11-20 02:48:01.727 Simpl[10769:34481] [Simpl] appear Dashboard: 765 ms
+2026-11-20 02:48:02.170 Simpl[10769:34481] [Simpl] appear Dashboard: 1208 ms
+2026-11-20 02:48:09.773 Simpl[10769:34481] [Simpl] open Dashboard: 8807 ms (kept)
+2026-11-20 02:48:10.486 Simpl[10769:34481] [Simpl] call quietColors: 8756 ms
+2026-11-20 02:48:10.612 Simpl[10769:34481] [Simpl] call dashList: 4833 ms
+2026-11-20 02:48:10.615 Simpl[10769:34481] [Simpl] call dashList: 5034 ms
+2026-11-20 02:48:10.622 Simpl[10769:34481] [Simpl] call moreHelp: 290 ms
+2026-11-20 02:48:10.756 Simpl[10769:34481] [Simpl] popup more: 440 × 263
+2026-11-20 02:48:10.802 Simpl[10769:34481] [Simpl] call today: 3441 ms
+2026-11-20 02:48:10.803 Simpl[10769:34481] [Simpl] call today: 3442 ms
+2026-11-20 02:48:10.803 Simpl[10769:34481] [Simpl] call todayCounts: 1048 ms
+2026-11-20 02:48:10.803 Simpl[10769:34481] [Simpl] call todayCounts: 1048 ms
+2026-11-20 02:48:10.805 Simpl[10769:34481] [Simpl] call dashSkyline: 5026 ms
+2026-11-20 02:48:10.806 Simpl[10769:34481] [Simpl] call dashSkyline: 5225 ms
+2026-11-20 02:48:10.806 Simpl[10769:34481] [Simpl] call todayCounts: 1051 ms
+2026-11-20 02:48:10.806 Simpl[10769:34481] [Simpl] call todayCounts: 1051 ms
+2026-11-20 02:48:10.812 Simpl[10769:34481] [Simpl] call snapshot: 481 ms
+2026-11-20 02:48:11.727 Simpl[10769:34481] [Simpl] open Dashboard: 10760 ms (live)
+2026-11-20 02:48:12.080 Simpl[10769:34481] [Simpl] call courses: 928 ms
+2026-11-20 02:48:12.758 Simpl[10769:34481] [Simpl] call groups: 672 ms
+2026-11-20 02:48:15.160 Simpl[10769:34481] [Simpl] call moreFromCanvas: 2401 ms
+2026-11-20 02:48:17.413 Simpl[10769:34481] [Simpl] shot: another copy of the app is in front; brought forward again

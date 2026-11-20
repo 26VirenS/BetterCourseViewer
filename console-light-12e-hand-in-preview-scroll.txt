@@ -1,0 +1,27 @@
+2026-11-20 02:55:56.397 Simpl[30426:85197] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-20 02:55:58.227 Simpl[30426:85197] [Simpl] window: the app's screens (no page)
+2026-11-20 02:55:58.889 Simpl[30426:85197] [Simpl] appear Course home: 1054 ms
+2026-11-20 02:55:59.661 Simpl[30426:85197] [Simpl] appear Course home: 1825 ms
+2026-11-20 02:56:03.154 Simpl[30426:85197] [Simpl] open Course home: 5317 ms (kept)
+2026-11-20 02:56:04.034 Simpl[30426:85197] [Simpl] appear Assignment: 552 ms
+2026-11-20 02:56:05.567 Simpl[30426:85197] [Simpl] call quietColors: 6675 ms
+2026-11-20 02:56:05.569 Simpl[30426:85197] [Simpl] call neighbours: 793 ms
+2026-11-20 02:56:05.570 Simpl[30426:85197] [Simpl] call home: 3482 ms
+2026-11-20 02:56:05.585 Simpl[30426:85197] [Simpl] call snapshot: 2102 ms
+2026-11-20 02:56:05.890 Simpl[30426:85197] [Simpl] call home: 3803 ms
+2026-11-20 02:56:06.502 Simpl[30426:85197] [Simpl] call home: 4534 ms
+2026-11-20 02:56:06.503 Simpl[30426:85197] [Simpl] open Course home: 3020 ms (live)
+2026-11-20 02:56:06.674 Simpl[30426:85197] [Simpl] call assignment: 1279 ms
+2026-11-20 02:56:06.675 Simpl[30426:85197] SimplAssignment 1012: files 0, comments 0, steps Hand In, review 0, handIn 1, error -
+2026-11-20 02:56:07.443 Simpl[30426:85197] SimplMore group=Effort
+2026-11-20 02:56:08.370 Simpl[30426:85197] [Simpl] open Assignment: 4886 ms (fetched)
+2026-11-20 02:56:08.375 Simpl[30426:85197] [Simpl] popup handin:101/1012: 580 × 560
+2026-11-20 02:56:08.482 Simpl[30426:85197] [Simpl] call courses: 2595 ms
+2026-11-20 02:56:08.784 Simpl[30426:85197] [Simpl] call neighbours: 1180 ms
+2026-11-20 02:56:08.846 Simpl[30426:85197] [Simpl] call groups: 360 ms
+2026-11-20 02:56:09.188 Simpl[30426:85197] SimplHandIn added long-reading.pdf (1 files)
+2026-11-20 02:56:09.280 Simpl[30426:85197] SimplPreview: long-reading.pdf in PDFKit (6 pages)
+IOServiceMatchingfailed for: AppleM2ScalerParavirtDriver
+2026-11-20 02:56:11.819 Simpl[30426:85197] [Simpl] popup handin:101/1012: 977 × 560
+2026-11-20 02:56:12.303 Simpl[30426:85197] [Simpl] call moreFromCanvas: 3454 ms
+2026-11-20 02:56:15.356 Simpl[30426:85197] SimplScrollProbe: PDF, pages 6, scrolled yes (4000 → 3624)

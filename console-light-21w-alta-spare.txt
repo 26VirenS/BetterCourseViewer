@@ -1,0 +1,27 @@
+2026-11-20 02:52:06.250 Simpl[25806:72442] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-20 02:52:07.091 Simpl[25806:72442] [Simpl] window: the app's screens (no page)
+2026-11-20 02:52:07.369 Simpl[25806:72442] [Simpl] appear Dashboard: 430 ms
+2026-11-20 02:52:07.568 Simpl[25806:72442] [Simpl] appear Dashboard: 629 ms
+2026-11-20 02:52:09.159 Simpl[25806:72442] [Simpl] open Dashboard: 2219 ms (kept)
+2026-11-20 02:52:09.486 Simpl[25806:72442] [Simpl] alta: a spare web view made ahead (78 ms)
+2026-11-20 02:52:09.592 Simpl[25806:72442] [Simpl] call quietColors: 2223 ms
+2026-11-20 02:52:09.693 Simpl[25806:72442] [Simpl] alta: the spare web view taken
+2026-11-20 02:52:09.895 Simpl[25806:72442] [Simpl] popup alta: 984 × 591, 20 in from the window (sidebar out)
+2026-11-20 02:52:10.336 Simpl[25806:72442] [Simpl] call todayCounts: 1191 ms
+2026-11-20 02:52:10.336 Simpl[25806:72442] [Simpl] call todayCounts: 1192 ms
+2026-11-20 02:52:10.336 Simpl[25806:72442] [Simpl] call today: 1966 ms
+2026-11-20 02:52:10.336 Simpl[25806:72442] [Simpl] call today: 1971 ms
+2026-11-20 02:52:10.336 Simpl[25806:72442] [Simpl] call todayCounts: 1192 ms
+2026-11-20 02:52:10.337 Simpl[25806:72442] [Simpl] call todayCounts: 1192 ms
+2026-11-20 02:52:10.337 Simpl[25806:72442] [Simpl] call dashList: 2041 ms
+2026-11-20 02:52:10.338 Simpl[25806:72442] [Simpl] call dashList: 2043 ms
+2026-11-20 02:52:10.339 Simpl[25806:72442] [Simpl] call dashSkyline: 2042 ms
+2026-11-20 02:52:10.339 Simpl[25806:72442] [Simpl] call snapshot: 931 ms
+2026-11-20 02:52:10.443 Simpl[25806:72442] [Simpl] call toolLaunch: 152 ms
+2026-11-20 02:52:11.207 Simpl[25806:72442] [Simpl] call dashSkyline: 2911 ms
+2026-11-20 02:52:11.212 Simpl[25806:72442] [Simpl] open Dashboard: 4273 ms (live)
+2026-11-20 02:52:11.458 Simpl[25806:72442] [Simpl] call courses: 1016 ms
+2026-11-20 02:52:11.577 Simpl[25806:72442] [Simpl] alta: view spare · asked 597 ms · launch 750 ms · page 1621 ms · overview 1765 ms · shown 1765 ms (overview, quiet 124 ms, 141 ms after DOMContentLoaded)
+2026-11-20 02:52:11.668 Simpl[25806:72442] [Simpl] call assignment: 284 ms
+2026-11-20 02:52:11.673 Simpl[25806:72442] [Simpl] call groups: 213 ms
+2026-11-20 02:52:12.590 Simpl[25806:72442] [Simpl] call moreFromCanvas: 917 ms

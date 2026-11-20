@@ -1,0 +1,28 @@
+2026-11-20 02:57:55.848 Simpl[29770:81248] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-20 02:58:00.850 Simpl[29770:81248] [Simpl] window: the app's screens (no page)
+2026-11-20 02:58:01.898 Simpl[29770:81248] [Simpl] appear Dashboard: 2128 ms
+2026-11-20 02:58:02.558 Simpl[29770:81248] [Simpl] appear Dashboard: 2788 ms
+2026-11-20 02:58:14.406 Simpl[29770:81248] [Simpl] open Dashboard: 14636 ms (kept)
+2026-11-20 02:58:16.139 Simpl[29770:81248] [Simpl] popup look: 984 × 591, 20 in from the window (sidebar out)
+2026-11-20 02:58:20.102 Simpl[29770:81248] [Simpl] call toolLaunch: 2783 ms
+2026-11-20 02:58:20.104 Simpl[29770:81248] [Simpl] macmillan popup: opened
+2026-11-20 02:58:20.351 Simpl[29770:81248] [Simpl] call quietColors: 18468 ms
+2026-11-20 02:58:20.520 Simpl[29770:81248] [Simpl] call snapshot: 5685 ms
+2026-11-20 02:58:20.937 Simpl[29770:81248] [Simpl] call dashSkyline: 9787 ms
+2026-11-20 02:58:20.938 Simpl[29770:81248] [Simpl] call dashList: 9789 ms
+2026-11-20 02:58:20.939 Simpl[29770:81248] [Simpl] call dashSkyline: 9790 ms
+2026-11-20 02:58:20.939 Simpl[29770:81248] [Simpl] call todayCounts: 6597 ms
+2026-11-20 02:58:20.940 Simpl[29770:81248] [Simpl] call todayCounts: 6598 ms
+2026-11-20 02:58:20.944 Simpl[29770:81248] [Simpl] call todayCounts: 6601 ms
+2026-11-20 02:58:20.944 Simpl[29770:81248] [Simpl] call todayCounts: 6602 ms
+2026-11-20 02:58:20.945 Simpl[29770:81248] [Simpl] call today: 9478 ms
+2026-11-20 02:58:20.946 Simpl[29770:81248] [Simpl] call today: 9484 ms
+2026-11-20 02:58:20.946 Simpl[29770:81248] [Simpl] call dashList: 9796 ms
+2026-11-20 02:58:22.749 Simpl[29770:81248] [Simpl] open Dashboard: 22979 ms (live)
+2026-11-20 02:58:23.703 Simpl[29770:81248] [Simpl] macmillan popup: cover heard, 4 questions, 5 grading settings
+2026-11-20 02:58:23.707 Simpl[29770:81248] [Simpl] macmillan popup: rail heard, 0 questions, 0 done, question 0 open
+2026-11-20 02:58:23.707 Simpl[29770:81248] [Simpl] look popup: page at 69% (its 1024 wide in 703)
+2026-11-20 02:58:23.933 Simpl[29770:81248] [Simpl] call courses: 2996 ms
+2026-11-20 02:58:26.369 Simpl[29770:81248] [Simpl] call groups: 2436 ms
+2026-11-20 02:58:28.228 Simpl[29770:81248] [Simpl] call moreFromCanvas: 1853 ms
+2026-11-20 02:58:45.593 Simpl[29770:81248] [Simpl] popup look: 984 × 589, 20 in from the window (sidebar out)

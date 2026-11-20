@@ -1,0 +1,127 @@
+2026-11-20 03:01:28.975 Simpl[39526:106732] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-20 03:01:29.435 Simpl[39526:106732] [Simpl] window: the app's screens (no page)
+2026-11-20 03:01:29.574 Simpl[39526:106732] [Simpl] appear Dashboard: 233 ms
+2026-11-20 03:01:29.698 Simpl[39526:106732] [Simpl] appear Dashboard: 357 ms
+2026-11-20 03:01:31.292 Simpl[39526:106732] [Simpl] open Dashboard: 1951 ms (kept)
+2026-11-20 03:01:31.860 Simpl[39526:106732] [Simpl] call quietColors: 2287 ms
+2026-11-20 03:01:32.427 Simpl[39526:106732] [Simpl] call dashList: 2204 ms
+2026-11-20 03:01:32.428 Simpl[39526:106732] [Simpl] call dashList: 2206 ms
+2026-11-20 03:01:32.654 Simpl[39526:106732] [Simpl] call today: 2377 ms
+2026-11-20 03:01:32.655 Simpl[39526:106732] [Simpl] call today: 2379 ms
+2026-11-20 03:01:32.656 Simpl[39526:106732] [Simpl] call todayCounts: 1386 ms
+2026-11-20 03:01:32.656 Simpl[39526:106732] [Simpl] call snapshot: 1027 ms
+2026-11-20 03:01:33.244 Simpl[39526:106732] [Simpl] call todayCounts: 1974 ms
+2026-11-20 03:01:33.264 Simpl[39526:106732] [Simpl] open Dashboard: 3922 ms (live)
+2026-11-20 03:01:33.346 Simpl[39526:106732] [Simpl] call todayCounts: 2076 ms
+2026-11-20 03:01:33.346 Simpl[39526:106732] [Simpl] call todayCounts: 2077 ms
+2026-11-20 03:01:33.347 Simpl[39526:106732] [Simpl] call courses: 536 ms
+2026-11-20 03:01:33.499 Simpl[39526:106732] [Simpl] call dashSkyline: 3276 ms
+2026-11-20 03:01:33.501 Simpl[39526:106732] [Simpl] call dashSkyline: 3279 ms
+2026-11-20 03:01:34.161 Simpl[39526:106732] [Simpl] call groups: 815 ms
+2026-11-20 03:01:35.457 Simpl[39526:106732] [Simpl] call moreFromCanvas: 1295 ms
+2026-11-20 03:01:36.634 Simpl[39526:106732] [Simpl] walk: todo
+2026-11-20 03:01:36.810 Simpl[39526:106732] [Simpl] appear Calendar: 175 ms
+2026-11-20 03:01:37.209 Simpl[39526:106732] [Simpl] call calView: 398 ms
+2026-11-20 03:01:37.498 Simpl[39526:106732] [Simpl] call calendar: 288 ms
+2026-11-20 03:01:38.389 Simpl[39526:106732] [Simpl] calendar month: To Do beside the month
+2026-11-20 03:01:38.389 Simpl[39526:106732] [Simpl] calendar month: days 60 pt across, items as dots
+2026-11-20 03:01:38.392 Simpl[39526:106732] [Simpl] calendar head: two lines, its tools named: To Do, Sync, Calendars
+2026-11-20 03:01:38.936 Simpl[39526:106732] [Simpl] open Calendar: 2301 ms (fetched)
+2026-11-20 03:01:38.956 Simpl[39526:106732] [Simpl] call todo: 19 ms
+2026-11-20 03:01:40.293 Simpl[39526:106732] [Simpl] read ahead todayCounts: 10 ms
+2026-11-20 03:01:40.293 Simpl[39526:106732] [Simpl] read ahead today: 10 ms
+2026-11-20 03:01:40.424 Simpl[39526:106732] [Simpl] read ahead dashSkyline: 4 ms
+2026-11-20 03:01:40.424 Simpl[39526:106732] [Simpl] read ahead dashList: 4 ms
+2026-11-20 03:01:40.459 Simpl[39526:106732] [Simpl] walk: grades
+2026-11-20 03:01:40.621 Simpl[39526:106732] [Simpl] appear Grades: 162 ms
+2026-11-20 03:01:41.385 Simpl[39526:106732] [Simpl] call grades: 763 ms
+2026-11-20 03:01:42.050 Simpl[39526:106732] [Simpl] open Grades: 1591 ms (fetched)
+2026-11-20 03:01:42.057 Simpl[39526:106732] [Simpl] call courseGrades: 379 ms
+2026-11-20 03:01:42.156 Simpl[39526:106732] [Simpl] read ahead notifications: 6 ms
+2026-11-20 03:01:42.547 Simpl[39526:106732] [Simpl] read ahead inbox: 265 ms
+2026-11-20 03:01:42.808 Simpl[39526:106732] [Simpl] read ahead allCourses: 527 ms
+2026-11-20 03:01:43.111 Simpl[39526:106732] [Simpl] walk: calendar
+2026-11-20 03:01:43.180 Simpl[39526:106732] [Simpl] appear Calendar: 68 ms
+2026-11-20 03:01:43.712 Simpl[39526:106732] [Simpl] calendar month: To Do put away, to give the days room
+2026-11-20 03:01:43.712 Simpl[39526:106732] [Simpl] calendar month: days 99 pt across, items by name
+2026-11-20 03:01:43.712 Simpl[39526:106732] [Simpl] calendar head: two lines, its tools named: To Do, Sync, Calendars
+2026-11-20 03:01:43.913 Simpl[39526:106732] [Simpl] open Calendar: 801 ms (cached)
+2026-11-20 03:01:44.158 Simpl[39526:106732] [Simpl] read ahead coursesProgress: 1486 ms
+2026-11-20 03:01:44.158 Simpl[39526:106732] [Simpl] read ahead home: 1228 ms
+2026-11-20 03:01:44.621 Simpl[39526:106732] [Simpl] read ahead home: 279 ms
+2026-11-20 03:01:44.877 Simpl[39526:106732] [Simpl] read ahead home: 535 ms
+2026-11-20 03:01:45.000 Simpl[39526:106732] [Simpl] read ahead home: 258 ms
+2026-11-20 03:01:45.158 Simpl[39526:106732] [Simpl] walk: notifications
+2026-11-20 03:01:45.256 Simpl[39526:106732] [Simpl] appear Notifications: 97 ms
+2026-11-20 03:01:45.968 Simpl[39526:106732] [Simpl] open Notifications: 810 ms (cached)
+2026-11-20 03:01:46.138 Simpl[39526:106732] [Simpl] read ahead home: 1137 ms
+2026-11-20 03:01:47.145 Simpl[39526:106732] [Simpl] walk: inbox
+2026-11-20 03:01:47.221 Simpl[39526:106732] [Simpl] appear Inbox: 77 ms
+2026-11-20 03:01:47.667 Simpl[39526:106732] [Simpl] open Inbox: 522 ms (cached)
+2026-11-20 03:01:47.925 Simpl[39526:106732] [Simpl] call inbox: 702 ms
+2026-11-20 03:01:48.807 Simpl[39526:106732] [Simpl] walk: course:101
+2026-11-20 03:01:49.003 Simpl[39526:106732] [Simpl] appear Course home: 196 ms
+2026-11-20 03:01:49.455 Simpl[39526:106732] [Simpl] open Course home: 648 ms (cached)
+2026-11-20 03:01:49.729 Simpl[39526:106732] [Simpl] call home: 277 ms
+2026-11-20 03:01:50.739 Simpl[39526:106732] [Simpl] walk: externaltools
+2026-11-20 03:01:50.874 Simpl[39526:106732] [Simpl] appear External Tools: 135 ms
+2026-11-20 03:01:51.571 Simpl[39526:106732] [Simpl] call externalTools: 697 ms
+2026-11-20 03:01:51.705 Simpl[39526:106732] [Simpl] open External Tools: 966 ms (fetched)
+2026-11-20 03:01:52.807 Simpl[39526:106732] [Simpl] walk: dashboard
+2026-11-20 03:01:53.038 Simpl[39526:106732] [Simpl] open Dashboard: 231 ms (alive)
+2026-11-20 03:01:54.181 Simpl[39526:106732] [Simpl] walk: todo
+2026-11-20 03:01:54.255 Simpl[39526:106732] [Simpl] appear Calendar: 74 ms
+2026-11-20 03:01:54.878 Simpl[39526:106732] [Simpl] calendar month: To Do beside the month
+2026-11-20 03:01:54.880 Simpl[39526:106732] [Simpl] calendar month: days 60 pt across, items as dots
+2026-11-20 03:01:54.880 Simpl[39526:106732] [Simpl] calendar head: two lines, its tools named: To Do, Sync, Calendars
+2026-11-20 03:01:55.348 Simpl[39526:106732] [Simpl] open Calendar: 1167 ms (cached)
+2026-11-20 03:01:56.645 Simpl[39526:106732] [Simpl] walk: grades
+2026-11-20 03:01:56.772 Simpl[39526:106732] [Simpl] appear Grades: 126 ms
+2026-11-20 03:01:57.371 Simpl[39526:106732] [Simpl] open Grades: 725 ms (cached)
+2026-11-20 03:01:57.702 Simpl[39526:106732] [Simpl] call courseGrades: 598 ms
+2026-11-20 03:01:58.730 Simpl[39526:106732] [Simpl] walk: calendar
+2026-11-20 03:01:58.806 Simpl[39526:106732] [Simpl] appear Calendar: 75 ms
+2026-11-20 03:01:59.093 Simpl[39526:106732] [Simpl] calendar month: To Do put away, to give the days room
+2026-11-20 03:01:59.094 Simpl[39526:106732] [Simpl] calendar month: days 99 pt across, items by name
+2026-11-20 03:01:59.094 Simpl[39526:106732] [Simpl] calendar head: two lines, its tools named: To Do, Sync, Calendars
+2026-11-20 03:01:59.438 Simpl[39526:106732] [Simpl] open Calendar: 708 ms (cached)
+2026-11-20 03:02:00.750 Simpl[39526:106732] [Simpl] walk: notifications
+2026-11-20 03:02:00.922 Simpl[39526:106732] [Simpl] appear Notifications: 171 ms
+2026-11-20 03:02:01.905 Simpl[39526:106732] [Simpl] open Notifications: 1154 ms (cached)
+2026-11-20 03:02:03.186 Simpl[39526:106732] [Simpl] walk: inbox
+2026-11-20 03:02:03.255 Simpl[39526:106732] [Simpl] appear Inbox: 69 ms
+2026-11-20 03:02:03.626 Simpl[39526:106732] [Simpl] open Inbox: 439 ms (cached)
+2026-11-20 03:02:03.943 Simpl[39526:106732] [Simpl] call inbox: 687 ms
+2026-11-20 03:02:05.063 Simpl[39526:106732] [Simpl] walk: course:101
+2026-11-20 03:02:05.186 Simpl[39526:106732] [Simpl] appear Course home: 122 ms
+2026-11-20 03:02:05.739 Simpl[39526:106732] [Simpl] open Course home: 676 ms (cached)
+2026-11-20 03:02:06.949 Simpl[39526:106732] [Simpl] walk: push:/courses/101/assignments/1001
+2026-11-20 03:02:07.182 Simpl[39526:106732] [Simpl] appear Assignment: 232 ms
+2026-11-20 03:02:07.820 Simpl[39526:106732] SimplMore group=Effort
+2026-11-20 03:02:08.232 Simpl[39526:106732] [Simpl] open Assignment: 1282 ms (kept)
+2026-11-20 03:02:08.292 Simpl[39526:106732] [Simpl] call neighbours: 346 ms
+2026-11-20 03:02:08.292 Simpl[39526:106732] [Simpl] call neighbours: 1052 ms
+2026-11-20 03:02:08.757 Simpl[39526:106732] [Simpl] call assignment: 1253 ms
+2026-11-20 03:02:08.789 Simpl[39526:106732] [Simpl] open Assignment: 1839 ms (live)
+2026-11-20 03:02:09.275 Simpl[39526:106732] [Simpl] call quizIntro: 518 ms
+2026-11-20 03:02:09.275 Simpl[39526:106732] SimplAssignment 1001: files 0, comments 2, steps See Feedback+New Attempt, review 0, handIn 0, error -
+2026-11-20 03:02:09.309 Simpl[39526:106732] [Simpl] walk: back
+2026-11-20 03:02:13.392 Simpl[39526:106732] [Simpl] walk: externaltools
+2026-11-20 03:02:13.544 Simpl[39526:106732] [Simpl] appear External Tools: 151 ms
+2026-11-20 03:02:13.980 Simpl[39526:106732] [Simpl] open External Tools: 587 ms (cached)
+2026-11-20 03:02:15.289 Simpl[39526:106732] [Simpl] walk: dashboard
+2026-11-20 03:02:15.573 Simpl[39526:106732] [Simpl] open Dashboard: 285 ms (alive)
+2026-11-20 03:02:16.865 Simpl[39526:106732] [Simpl] walk: push:/courses/101/assignments/1001
+2026-11-20 03:02:17.059 Simpl[39526:106732] [Simpl] appear Section Assignments: 194 ms
+2026-11-20 03:02:17.521 Simpl[39526:106732] [Simpl] appear Assignment: 656 ms
+2026-11-20 03:02:17.684 Simpl[39526:106732] SimplMore group=Effort
+2026-11-20 03:02:18.101 Simpl[39526:106732] [Simpl] open Assignment: 1236 ms (cached)
+2026-11-20 03:02:18.299 Simpl[39526:106732] [Simpl] open Section Assignments: 1433 ms (kept)
+2026-11-20 03:02:18.311 Simpl[39526:106732] [Simpl] call quizIntro: 787 ms
+2026-11-20 03:02:18.311 Simpl[39526:106732] SimplAssignment 1001: files 0, comments 2, steps See Feedback+New Attempt, review 0, handIn 0, error -
+2026-11-20 03:02:18.377 Simpl[39526:106732] [Simpl] call neighbours: 621 ms
+2026-11-20 03:02:18.468 Simpl[39526:106732] [Simpl] call assignments: 372 ms
+2026-11-20 03:02:18.493 Simpl[39526:106732] [Simpl] open Section Assignments: 1628 ms (live)
+2026-11-20 03:02:19.447 Simpl[39526:106732] [Simpl] walk: back
+2026-11-20 03:02:19.701 Simpl[39526:106732] [Simpl] open Dashboard: 254 ms (alive)
+2026-11-20 03:02:21.016 Simpl[39526:106732] [Simpl] walk: done

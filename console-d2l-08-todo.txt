@@ -1,0 +1,30 @@
+2026-11-20 03:01:08.629 Simpl[38223:103209] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-20 03:01:12.663 Simpl[38223:103209] [Simpl] window: the app's screens (/d2l/home)
+2026-11-20 03:01:13.394 Simpl[38223:103209] [Simpl] appear Dashboard: 2988 ms
+2026-11-20 03:01:13.509 Simpl[38223:103209] [Simpl] appear Dashboard: 3103 ms
+2026-11-20 03:01:15.827 Simpl[38223:103209] [Simpl] appear Calendar: 5421 ms
+2026-11-20 03:01:16.076 Simpl[38223:103209] [Simpl] call quietColors: 2682 ms
+2026-11-20 03:01:16.078 Simpl[38223:103209] [Simpl] call dashSkyline: 457 ms
+2026-11-20 03:01:16.078 Simpl[38223:103209] [Simpl] call today: 458 ms
+2026-11-20 03:01:16.078 Simpl[38223:103209] [Simpl] call calView: 250 ms
+2026-11-20 03:01:16.079 Simpl[38223:103209] [Simpl] call dashSkyline: 459 ms
+2026-11-20 03:01:16.080 Simpl[38223:103209] [Simpl] call today: 2562 ms
+2026-11-20 03:01:16.380 Simpl[38223:103209] [Simpl] call snapshot: 761 ms
+2026-11-20 03:01:16.414 Simpl[38223:103209] [Simpl] call dashList: 794 ms
+2026-11-20 03:01:16.415 Simpl[38223:103209] [Simpl] call dashList: 794 ms
+2026-11-20 03:01:16.416 Simpl[38223:103209] [Simpl] open Dashboard: 6009 ms (fetched)
+2026-11-20 03:01:16.722 Simpl[38223:103209] [Simpl] call todayCounts: 647 ms
+2026-11-20 03:01:16.722 Simpl[38223:103209] [Simpl] call todayCounts: 647 ms
+2026-11-20 03:01:16.722 Simpl[38223:103209] [Simpl] call todayCounts: 647 ms
+2026-11-20 03:01:16.722 Simpl[38223:103209] [Simpl] call todayCounts: 647 ms
+2026-11-20 03:01:16.775 Simpl[38223:103209] [Simpl] call dashSkyline: 697 ms
+2026-11-20 03:01:16.775 Simpl[38223:103209] [Simpl] call dashSkyline: 696 ms
+2026-11-20 03:01:16.776 Simpl[38223:103209] [Simpl] call calendar: 697 ms
+2026-11-20 03:01:17.238 Simpl[38223:103209] [Simpl] calendar month: To Do beside the month
+2026-11-20 03:01:17.238 Simpl[38223:103209] [Simpl] calendar month: days 60 pt across, items as dots
+2026-11-20 03:01:17.238 Simpl[38223:103209] [Simpl] calendar head: two lines, its tools named: To Do, Sync, Calendars
+2026-11-20 03:01:18.055 Simpl[38223:103209] [Simpl] open Calendar: 7649 ms (fetched)
+2026-11-20 03:01:18.058 Simpl[38223:103209] [Simpl] call courses: 1645 ms
+2026-11-20 03:01:18.542 Simpl[38223:103209] [Simpl] call todo: 487 ms
+2026-11-20 03:01:19.360 Simpl[38223:103209] [Simpl] call groups: 1301 ms
+2026-11-20 03:01:19.571 Simpl[38223:103209] [Simpl] call moreFromCanvas: 211 ms

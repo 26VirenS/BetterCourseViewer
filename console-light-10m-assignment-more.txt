@@ -1,0 +1,20 @@
+2026-11-20 02:55:19.989 Simpl[29035:81421] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-20 02:55:21.901 Simpl[29035:81421] [Simpl] window: the app's screens (no page)
+2026-11-20 02:55:22.371 Simpl[29035:81421] [Simpl] appear Course home: 753 ms
+2026-11-20 02:55:23.008 Simpl[29035:81421] [Simpl] appear Course home: 1390 ms
+2026-11-20 02:55:29.265 Simpl[29035:81421] [Simpl] appear Assignment: 211 ms
+2026-11-20 02:55:31.301 Simpl[29035:81421] [Simpl] call quietColors: 8930 ms
+2026-11-20 02:55:31.303 Simpl[29035:81421] [Simpl] call home: 4428 ms
+2026-11-20 02:55:31.304 Simpl[29035:81421] [Simpl] call home: 4420 ms
+2026-11-20 02:55:31.305 Simpl[29035:81421] [Simpl] call home: 4432 ms
+2026-11-20 02:55:31.828 Simpl[29035:81421] [Simpl] call neighbours: 2456 ms
+2026-11-20 02:55:31.829 Simpl[29035:81421] [Simpl] open Course home: 2774 ms (fetched)
+2026-11-20 02:55:31.884 Simpl[29035:81421] [Simpl] call snapshot: 2829 ms
+2026-11-20 02:55:31.978 Simpl[29035:81421] [Simpl] call assignment: 714 ms
+2026-11-20 02:55:32.010 Simpl[29035:81421] SimplAssignment 4002: files 0, comments 0, steps Hand In, review 0, handIn 0, error -
+2026-11-20 02:55:32.563 Simpl[29035:81421] SimplMore group=Assignments | peer=2 classmates’ work to review · assigned Nov 21 at 9:00 AM | files=PDF, DOCX, PNG or JPG only | similarity=Turnitin checks it for copied work
+2026-11-20 02:55:33.397 Simpl[29035:81421] [Simpl] open Assignment: 4342 ms (fetched)
+2026-11-20 02:55:33.449 Simpl[29035:81421] [Simpl] call neighbours: 516 ms
+2026-11-20 02:55:33.525 Simpl[29035:81421] [Simpl] call courses: 1547 ms
+2026-11-20 02:55:33.911 Simpl[29035:81421] [Simpl] call groups: 385 ms
+2026-11-20 02:55:35.147 Simpl[29035:81421] [Simpl] call moreFromCanvas: 1235 ms

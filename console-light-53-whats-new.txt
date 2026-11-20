@@ -1,0 +1,24 @@
+2026-11-20 02:55:54.731 Simpl[35594:96689] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-20 02:55:55.469 Simpl[35594:96689] [Simpl] window: the app's screens (no page)
+2026-11-20 02:55:55.824 Simpl[35594:96689] [Simpl] appear Dashboard: 472 ms
+2026-11-20 02:55:56.575 Simpl[35594:96689] [Simpl] appear Dashboard: 1222 ms
+2026-11-20 02:56:04.823 Simpl[35594:96689] [Simpl] open Dashboard: 9470 ms (kept)
+2026-11-20 02:56:07.187 Simpl[35594:96689] [Simpl] call quietColors: 11364 ms
+2026-11-20 02:56:07.242 Simpl[35594:96689] [Simpl] call dashList: 7695 ms
+2026-11-20 02:56:07.243 Simpl[35594:96689] [Simpl] call dashList: 7669 ms
+2026-11-20 02:56:07.243 Simpl[35594:96689] [Simpl] call snapshot: 474 ms
+2026-11-20 02:56:08.134 Simpl[35594:96689] [Simpl] call todayCounts: 3340 ms
+2026-11-20 02:56:08.135 Simpl[35594:96689] [Simpl] call todayCounts: 3341 ms
+2026-11-20 02:56:08.135 Simpl[35594:96689] [Simpl] call todayCounts: 3341 ms
+2026-11-20 02:56:08.135 Simpl[35594:96689] [Simpl] call today: 8427 ms
+2026-11-20 02:56:08.135 Simpl[35594:96689] [Simpl] call todayCounts: 3342 ms
+2026-11-20 02:56:08.135 Simpl[35594:96689] [Simpl] call dashSkyline: 8589 ms
+2026-11-20 02:56:08.136 Simpl[35594:96689] [Simpl] call dashSkyline: 8562 ms
+2026-11-20 02:56:08.137 Simpl[35594:96689] [Simpl] call today: 8429 ms
+2026-11-20 02:56:08.323 Simpl[35594:96689] [Simpl] call courses: 897 ms
+2026-11-20 02:56:08.326 Simpl[35594:96689] [Simpl] open Dashboard: 12973 ms (live)
+2026-11-20 02:56:09.670 Simpl[35594:96689] [Simpl] call groups: 1347 ms
+2026-11-20 02:56:10.802 Simpl[35594:96689] [Simpl] call moreFromCanvas: 1126 ms
+2026-11-20 02:56:12.575 Simpl[35594:96689] [Simpl] what's new: 3 highlights of 3 notes from 3 versions (1.3.219 to 1.3.221), 0 for developers left out: Out of Beta; Glass Download; Download Stands Out
+2026-11-20 02:56:12.784 Simpl[35594:96689] [Simpl] popup whatsnew: 500 × 560
+2026-11-20 02:56:35.876 Simpl[35594:96689] [Simpl] shot: another copy of the app is in front; brought forward again

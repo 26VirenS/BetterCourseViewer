@@ -1,0 +1,19 @@
+2026-11-20 03:00:21.740 Simpl[36768:99413] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-20 03:00:22.621 Simpl[36768:99413] [Simpl] window: the app's screens (no page)
+2026-11-20 03:00:23.060 Simpl[36768:99413] [Simpl] appear External Tools: 578 ms
+2026-11-20 03:00:23.528 Simpl[36768:99413] [Simpl] appear External Tools: 1046 ms
+2026-11-20 03:00:27.006 Simpl[36768:99413] [Simpl] call quietColors: 3946 ms
+2026-11-20 03:00:27.107 Simpl[36768:99413] [Simpl] call snapshot: 149 ms
+2026-11-20 03:00:27.195 Simpl[36768:99413] [Simpl] call externalTools: 3666 ms
+2026-11-20 03:00:27.195 Simpl[36768:99413] [Simpl] tool list: opening Knewton Alta
+2026-11-20 03:00:27.195 Simpl[36768:99413] [Simpl] call externalTools: 4135 ms
+2026-11-20 03:00:27.195 Simpl[36768:99413] [Simpl] tool list: opening Knewton Alta
+2026-11-20 03:00:27.533 Simpl[36768:99413] [Simpl] tool list shown: Knewton Alta
+2026-11-20 03:00:27.534 Simpl[36768:99413] [Simpl] tool list shown: Knewton Alta
+2026-11-20 03:00:27.556 Simpl[36768:99413] [Simpl] tool list closed: Knewton Alta
+2026-11-20 03:00:27.676 Simpl[36768:99413] [Simpl] open External Tools: 5195 ms (fetched)
+2026-11-20 03:00:28.310 Simpl[36768:99413] [Simpl] call courses: 1151 ms
+2026-11-20 03:00:28.559 Simpl[36768:99413] [Simpl] call groups: 249 ms
+2026-11-20 03:00:29.263 Simpl[36768:99413] [Simpl] call moreFromCanvas: 702 ms
+2026-11-20 03:00:32.517 Simpl[36768:99413] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-11-20 03:00:33.678 Simpl[36768:99413] [Simpl] shot: another copy of the app is in front; brought forward again

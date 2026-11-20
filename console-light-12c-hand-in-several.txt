@@ -1,0 +1,29 @@
+2026-11-20 02:59:31.810 Simpl[34558:93766] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-20 02:59:32.615 Simpl[34558:93766] [Simpl] window: the app's screens (no page)
+2026-11-20 02:59:33.089 Simpl[34558:93766] [Simpl] appear Course home: 582 ms
+2026-11-20 02:59:33.828 Simpl[34558:93766] [Simpl] appear Course home: 1322 ms
+2026-11-20 02:59:38.009 Simpl[34558:93766] [Simpl] open Course home: 5502 ms (kept)
+2026-11-20 02:59:38.784 Simpl[34558:93766] [Simpl] appear Assignment: 273 ms
+2026-11-20 02:59:41.225 Simpl[34558:93766] [Simpl] call quietColors: 8137 ms
+2026-11-20 02:59:41.227 Simpl[34558:93766] [Simpl] call neighbours: 1918 ms
+2026-11-20 02:59:41.228 Simpl[34558:93766] [Simpl] call home: 4499 ms
+2026-11-20 02:59:41.610 Simpl[34558:93766] [Simpl] call home: 4961 ms
+2026-11-20 02:59:41.612 Simpl[34558:93766] [Simpl] call snapshot: 3090 ms
+2026-11-20 02:59:41.731 Simpl[34558:93766] [Simpl] call home: 5152 ms
+2026-11-20 02:59:41.732 Simpl[34558:93766] [Simpl] open Course home: 3221 ms (live)
+2026-11-20 02:59:42.306 Simpl[34558:93766] [Simpl] call assignment: 1276 ms
+2026-11-20 02:59:42.307 Simpl[34558:93766] SimplAssignment 1012: files 0, comments 0, steps Hand In, review 0, handIn 1, error -
+2026-11-20 02:59:43.236 Simpl[34558:93766] SimplMore group=Effort
+2026-11-20 02:59:44.278 Simpl[34558:93766] [Simpl] open Assignment: 5767 ms (fetched)
+2026-11-20 02:59:44.279 Simpl[34558:93766] [Simpl] popup handin:101/1012: 580 × 560
+2026-11-20 02:59:44.376 Simpl[34558:93766] [Simpl] call courses: 2647 ms
+2026-11-20 02:59:44.815 Simpl[34558:93766] [Simpl] call neighbours: 1334 ms
+2026-11-20 02:59:44.818 Simpl[34558:93766] SimplHandIn adding 3 files at once
+2026-11-20 02:59:44.820 Simpl[34558:93766] SimplHandIn added calendar.png (1 files)
+2026-11-20 02:59:44.822 Simpl[34558:93766] SimplHandIn added grades.png (2 files)
+2026-11-20 02:59:44.823 Simpl[34558:93766] SimplHandIn added dashboard.png (3 files)
+2026-11-20 02:59:44.908 Simpl[34558:93766] SimplHandIn added 3 files at once: 3 in
+2026-11-20 02:59:44.934 Simpl[34558:93766] SimplPreview: dashboard.png in Quick Look
+2026-11-20 02:59:46.363 Simpl[34558:93766] [Simpl] popup handin:101/1012: 977 × 560
+2026-11-20 02:59:48.523 Simpl[34558:93766] [Simpl] call groups: 4146 ms
+2026-11-20 02:59:49.471 Simpl[34558:93766] [Simpl] call moreFromCanvas: 947 ms

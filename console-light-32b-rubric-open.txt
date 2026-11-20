@@ -1,0 +1,21 @@
+2026-11-20 02:55:30.859 Simpl[34290:93407] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-20 02:55:32.813 Simpl[34290:93407] [Simpl] window: the app's screens (no page)
+2026-11-20 02:55:33.772 Simpl[34290:93407] [Simpl] appear Course home: 1400 ms
+2026-11-20 02:55:34.758 Simpl[34290:93407] [Simpl] appear Course home: 2384 ms
+2026-11-20 02:55:38.893 Simpl[34290:93407] [Simpl] appear Assignment: 327 ms
+2026-11-20 02:55:42.207 Simpl[34290:93407] [Simpl] call quietColors: 8437 ms
+2026-11-20 02:55:42.332 Simpl[34290:93407] [Simpl] call home: 4397 ms
+2026-11-20 02:55:42.363 Simpl[34290:93407] [Simpl] call home: 4428 ms
+2026-11-20 02:55:42.364 Simpl[34290:93407] [Simpl] call neighbours: 2543 ms
+2026-11-20 02:55:42.365 Simpl[34290:93407] [Simpl] call home: 4549 ms
+2026-11-20 02:55:43.703 Simpl[34290:93407] [Simpl] call snapshot: 4888 ms
+2026-11-20 02:55:44.516 Simpl[34290:93407] [Simpl] open Course home: 5951 ms (fetched)
+2026-11-20 02:55:44.518 Simpl[34290:93407] [Simpl] call assignment: 2488 ms
+2026-11-20 02:55:44.525 Simpl[34290:93407] [Simpl] popup rubric: 984 × 591, 20 in from the window (sidebar out)
+2026-11-20 02:55:44.796 Simpl[34290:93407] SimplAssignment 4001: files 1, comments 3, steps See Feedback+Hand In Again, review 0, handIn 0, error -
+2026-11-20 02:55:45.197 Simpl[34290:93407] SimplMore group=Assignments
+2026-11-20 02:55:46.606 Simpl[34290:93407] [Simpl] open Assignment: 8041 ms (fetched)
+2026-11-20 02:55:46.640 Simpl[34290:93407] [Simpl] call neighbours: 1076 ms
+2026-11-20 02:55:46.674 Simpl[34290:93407] [Simpl] call courses: 2331 ms
+2026-11-20 02:55:46.989 Simpl[34290:93407] [Simpl] call groups: 314 ms
+2026-11-20 02:55:48.395 Simpl[34290:93407] [Simpl] call moreFromCanvas: 1406 ms

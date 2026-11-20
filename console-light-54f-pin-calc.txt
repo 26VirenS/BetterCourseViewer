@@ -1,0 +1,27 @@
+2026-11-20 02:52:19.086 Simpl[16730:48440] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/com.simplcourses.mac.savedState
+2026-11-20 02:52:20.713 Simpl[16730:48440] [Simpl] window: the app's screens (no page)
+2026-11-20 02:52:21.693 Simpl[16730:48440] [Simpl] appear Dashboard: 1335 ms
+2026-11-20 02:52:22.271 Simpl[16730:48440] [Simpl] appear Dashboard: 1913 ms
+2026-11-20 02:52:38.084 Simpl[16730:48440] [Simpl] open Dashboard: 17725 ms (kept)
+2026-11-20 02:52:39.291 Simpl[16730:48440] [Simpl] calculator: its page loaded
+2026-11-20 02:52:40.172 Simpl[16730:48440] [Simpl] call quietColors: 18492 ms
+2026-11-20 02:52:40.173 Simpl[16730:48440] [Simpl] call todayCounts: 2106 ms
+2026-11-20 02:52:40.173 Simpl[16730:48440] [Simpl] call todayCounts: 2108 ms
+2026-11-20 02:52:40.175 Simpl[16730:48440] [Simpl] call todayCounts: 2109 ms
+2026-11-20 02:52:40.175 Simpl[16730:48440] [Simpl] call todayCounts: 2110 ms
+2026-11-20 02:52:40.176 Simpl[16730:48440] [Simpl] call today: 12122 ms
+2026-11-20 02:52:40.176 Simpl[16730:48440] [Simpl] call today: 12123 ms
+2026-11-20 02:52:40.177 Simpl[16730:48440] [Simpl] call dashSkyline: 14661 ms
+2026-11-20 02:52:40.179 Simpl[16730:48440] [Simpl] call dashList: 14662 ms
+2026-11-20 02:52:40.179 Simpl[16730:48440] [Simpl] call dashSkyline: 14664 ms
+2026-11-20 02:52:40.179 Simpl[16730:48440] [Simpl] call dashList: 14665 ms
+2026-11-20 02:52:40.580 Simpl[16730:48440] [Simpl] open Dashboard: 20222 ms (live)
+2026-11-20 02:52:40.589 Simpl[16730:48440] [Simpl] call snapshot: 658 ms
+2026-11-20 02:52:41.586 Simpl[16730:48440] [Simpl] call courses: 891 ms
+2026-11-20 02:52:42.659 Simpl[16730:48440] [Simpl] call groups: 1057 ms
+2026-11-20 02:52:44.487 Simpl[16730:48440] [Simpl] call moreFromCanvas: 1826 ms
+2026-11-20 02:52:51.873 Simpl[16730:48440] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-11-20 02:52:54.011 Simpl[16730:48440] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-11-20 02:52:57.379 Simpl[16730:48440] [Simpl] calculator: its page loaded
+2026-11-20 02:53:01.321 Simpl[16730:48440] [Simpl] calculator: its page loaded
+2026-11-20 02:53:03.688 Simpl[16730:48440] [Simpl] calculator: GeoGebra is ready

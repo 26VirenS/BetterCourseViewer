@@ -1,0 +1,50 @@
+2026-11-20 02:55:24.258 Simpl[33978:92704] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-20 02:55:27.079 Simpl[33978:92704] [Simpl] window: the app's screens (no page)
+2026-11-20 02:55:27.737 Simpl[33978:92704] [Simpl] appear Dashboard: 1041 ms
+2026-11-20 02:55:28.259 Simpl[33978:92704] [Simpl] appear Dashboard: 1562 ms
+2026-11-20 02:55:43.151 Simpl[33978:92704] [Simpl] open Dashboard: 16454 ms (kept)
+2026-11-20 02:55:44.040 Simpl[33978:92704] [Simpl] call quietColors: 16306 ms
+2026-11-20 02:55:44.165 Simpl[33978:92704] [Simpl] call dashList: 11961 ms
+2026-11-20 02:55:44.165 Simpl[33978:92704] [Simpl] call dashList: 11961 ms
+2026-11-20 02:55:44.166 Simpl[33978:92704] [Simpl] call today: 11644 ms
+2026-11-20 02:55:44.167 Simpl[33978:92704] [Simpl] call today: 11646 ms
+2026-11-20 02:55:44.167 Simpl[33978:92704] [Simpl] call todayCounts: 1056 ms
+2026-11-20 02:55:44.167 Simpl[33978:92704] [Simpl] call todayCounts: 1057 ms
+2026-11-20 02:55:44.168 Simpl[33978:92704] [Simpl] call snapshot: 250 ms
+2026-11-20 02:55:44.524 Simpl[33978:92704] [Simpl] call todayCounts: 1414 ms
+2026-11-20 02:55:44.525 Simpl[33978:92704] [Simpl] call todayCounts: 1414 ms
+2026-11-20 02:55:45.148 Simpl[33978:92704] [Simpl] call dashSkyline: 12943 ms
+2026-11-20 02:55:45.149 Simpl[33978:92704] [Simpl] call dashSkyline: 12945 ms
+2026-11-20 02:55:45.152 Simpl[33978:92704] [Simpl] open Dashboard: 18455 ms (live)
+2026-11-20 02:55:45.525 Simpl[33978:92704] [Simpl] call courses: 1001 ms
+2026-11-20 02:55:46.192 Simpl[33978:92704] [Simpl] walk: on:/courses/101/assignments/1001
+2026-11-20 02:55:46.846 Simpl[33978:92704] [Simpl] appear Assignment: 654 ms
+2026-11-20 02:55:48.556 Simpl[33978:92704] SimplMore group=Effort
+2026-11-20 02:55:49.318 Simpl[33978:92704] [Simpl] open Assignment: 3126 ms (kept)
+2026-11-20 02:55:49.426 Simpl[33978:92704] [Simpl] call groups: 3900 ms
+2026-11-20 02:55:50.011 Simpl[33978:92704] [Simpl] call neighbours: 3010 ms
+2026-11-20 02:55:50.012 Simpl[33978:92704] [Simpl] call neighbours: 1098 ms
+2026-11-20 02:55:50.945 Simpl[33978:92704] [Simpl] call assignment: 2647 ms
+2026-11-20 02:55:51.014 Simpl[33978:92704] [Simpl] open Assignment: 4820 ms (live)
+2026-11-20 02:55:51.033 Simpl[33978:92704] [Simpl] walk: at dashboard, 1 pushed
+2026-11-20 02:55:51.033 Simpl[33978:92704] [Simpl] walk: again
+2026-11-20 02:55:51.411 Simpl[33978:92704] [Simpl] open Dashboard: 378 ms (alive)
+2026-11-20 02:55:51.426 Simpl[33978:92704] [Simpl] call moreFromCanvas: 2000 ms
+2026-11-20 02:55:51.448 Simpl[33978:92704] [Simpl] call quizIntro: 502 ms
+2026-11-20 02:55:51.449 Simpl[33978:92704] SimplAssignment 1001: files 0, comments 2, steps See Feedback+New Attempt, review 0, handIn 0, error -
+2026-11-20 02:55:52.431 Simpl[33978:92704] [Simpl] walk: at dashboard, 0 pushed
+2026-11-20 02:55:52.431 Simpl[33978:92704] [Simpl] walk: done
+2026-11-20 02:55:52.770 Simpl[33978:92704] [Simpl] read ahead calView: 9 ms
+2026-11-20 02:55:52.778 Simpl[33978:92704] [Simpl] read ahead todo: 16 ms
+2026-11-20 02:55:52.813 Simpl[33978:92704] [Simpl] read ahead calendar: 41 ms
+2026-11-20 02:55:52.956 Simpl[33978:92704] [Simpl] read ahead grades: 43 ms
+2026-11-20 02:55:52.964 Simpl[33978:92704] [Simpl] read ahead notifications: 23 ms
+2026-11-20 02:55:53.125 Simpl[33978:92704] [Simpl] read ahead inbox: 29 ms
+2026-11-20 02:55:53.128 Simpl[33978:92704] [Simpl] read ahead allCourses: 33 ms
+2026-11-20 02:55:53.268 Simpl[33978:92704] [Simpl] read ahead coursesProgress: 17 ms
+2026-11-20 02:55:53.277 Simpl[33978:92704] [Simpl] read ahead home: 26 ms
+2026-11-20 02:55:53.431 Simpl[33978:92704] [Simpl] read ahead home: 23 ms
+2026-11-20 02:55:53.436 Simpl[33978:92704] [Simpl] read ahead home: 28 ms
+2026-11-20 02:55:53.582 Simpl[33978:92704] [Simpl] read ahead home: 27 ms
+2026-11-20 02:55:53.588 Simpl[33978:92704] [Simpl] read ahead home: 23 ms
+2026-11-20 02:55:55.141 Simpl[33978:92704] [Simpl] shot: another copy of the app is in front; brought forward again
