@@ -27,8 +27,14 @@
     cal: 'M5 6h14v14H5zM5 10h14M9 3v4M15 3v4',
     lock: 'M7 11V8a5 5 0 0110 0v3M5 11h14v10H5z',
     slider: 'M4 8h16M4 16h16M9 5v6M15 13v6',
+    expand: 'M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.152', date: '2026-11-22', notes: [
+      { kind: 'new', title: 'Retakes in Targets', body: 'Count standards you can retake toward your target grade.', icon: P.steps },
+      { kind: 'new', title: 'Full-Screen Files', body: 'View any file full screen, then Esc to come back.', icon: P.expand },
+      { kind: 'fixed', title: 'Tools Open Right', body: 'Open Tool goes to the exact reading or activity.', icon: P.tool },
+    ] },
     { version: '2.99.151', date: '2026-11-17', notes: [
       { kind: 'new', title: 'Standards-Based Grades', body: 'See your level on each standard, and what each exam gave.', icon: P.steps },
     ] },
