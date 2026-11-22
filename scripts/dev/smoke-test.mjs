@@ -2555,6 +2555,50 @@ try {
   await page.click('.bcv-gpa-detail .bcv-bands__stop[data-band="all"]');
   const sheetAll = (await page.$$('.bcv-gpa-detail__arow')).length;
   check(sheetStops.A >= 1 && sheetA.length === sheetStops.A && sheetA.every((c) => c === 'A') && sheetAll === 18, `the details sheet's By letter lists one letter's work alone: ${JSON.stringify({ sheetStops, sheetA, sheetAll })}`);
+  // (2.99.152) Can be retaken (SR-MWJX45N1-X2TW): a group a retake could change is a switch — one that counts, with graded
+  // work short of full marks (MATH 021 has none: its quizzes are full marks, Effort and Collaboration count for nothing).
+  // Switched on (PHYS 008's Labs), what its graded work is short of counts as still open, so the target asks a share of
+  // more points — kept, and switched off it is as before
+  const rchipsMath = (await page.$$('.bcv-gpa-detail__rchip')).length;
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('.bcv-gpa-detail', { state: 'detached', timeout: 5000 });
+  await page.locator('.bcv-gpa__card', { hasText: 'PHYS-008-01' }).locator('.bcv-gpa__details').click();
+  await page.waitForSelector('.bcv-gpa-detail', { timeout: 5000 });
+  const needOf = () => page.$eval('.bcv-gpa-detail__need', (e) => e.textContent);
+  const retakesKept = () => sw.evaluate(async () => Object.entries(await chrome.storage.local.get(null)).find(([k]) => k.startsWith('prefs:'))?.[1]?.gradeRetakes || null);
+  const needBefore = await needOf();
+  const rchips = await page.$$eval('.bcv-gpa-detail__rchip', (els) => els.map((e) => ({ name: e.textContent, on: e.getAttribute('aria-pressed') })));
+  if (rchips.length) await page.click('.bcv-gpa-detail__rchip');
+  const needOn = await needOf();
+  const chipOn = await page.$eval('.bcv-gpa-detail__rchip', (e) => e.getAttribute('aria-pressed')).catch(() => null);
+  const keptOn = await retakesKept();
+  if (rchips.length) await page.click('.bcv-gpa-detail__rchip');
+  const needOff = await needOf();
+  const keptOff = await retakesKept();
+  const needPct = (t) => Number(/Needs (\d+)%/.exec(t)?.[1]);
+  check(rchipsMath === 0 && rchips.length === 1 && rchips[0].name === 'Labs' && rchips[0].on === 'false' && /^Needs \d+% of the remaining [\d.]+ pts$/.test(needBefore)
+    && /^Needs \d+% of the [\d.]+ pts still open, retakes included$/.test(needOn) && needPct(needOn) <= needPct(needBefore) && chipOn === 'true'
+    && keptOn?.['102']?.length === 1 && needOff === needBefore && keptOff && Object.keys(keptOff).length === 0,
+  `Can be retaken: offered only for a group a retake could change; switched on, the target counts what its graded work can still gain; kept; switched off, as before: ${JSON.stringify({ rchipsMath, rchips, needBefore, needOn, chipOn, keptOn, needOff, keptOff })}`);
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('.bcv-gpa-detail', { state: 'detached', timeout: 5000 });
+  await page.click('.bcv-gpa__card .bcv-gpa__details');
+  await page.waitForSelector('.bcv-gpa-detail', { timeout: 5000 });
+  // the maths, on the reporter's course: Exams half the grade, standards of 20 each — 60 of the 120 graded, 100 still to
+  // come — and the rest all done. Without retakes an A− (90%) is out of reach; with Exams' standards retakeable it is not
+  const sbg = await sw.evaluate(async (base) => { const [t] = await chrome.tabs.query({ url: `${base}/*` }); const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: t.id }, world: 'ISOLATED', func: () => {
+    const G = self.BCV.screens.gpa;
+    const graded = (n, score) => ({ name: `Standard ${n}`, points_possible: 20, published: true, submission: { workflow_state: 'graded', score } });
+    const open = (n) => ({ name: `Standard ${n}`, points_possible: 20, published: true, submission: { workflow_state: 'unsubmitted', score: null } });
+    const full = (w, name) => ({ id: name, name, group_weight: w, assignments: [{ name, points_possible: 10, published: true, submission: { workflow_state: 'graded', score: 10 } }] });
+    const groups = [full(18, 'Lecture Quizzes'), full(16, 'Discussion Worksheets'), { ...full(16, 'Discussion Quizzes'), assignments: [{ name: 'DQ', points_possible: 100, published: true, submission: { workflow_state: 'graded', score: 77 } }] },
+      { id: 'exams', name: 'Exams', group_weight: 50, assignments: [graded(1, 20), graded(2, 5), graded(3, 10), graded(4, 0), graded(5, 5), graded(6, 20), open(7), open(8), open(9), open(10), open(11)] }];
+    const plain = G.courseMath(groups, true);
+    const re = G.courseMath(groups, true, null, new Set(['exams']));
+    return { plain: Math.round(plain.needed(90)), re: Math.round(re.needed(90)), remaining: plain.remaining, open: re.open, retaking: re.retaking, plainRetaking: plain.retaking };
+  } }); return result; }, BASE);
+  check(sbg.plain > 100 && sbg.re > 0 && sbg.re <= 100 && sbg.remaining === 100 && sbg.open === 160 && sbg.retaking && !sbg.plainRetaking,
+    `a standards course whose A− is out of reach on the work still to come reaches it with retakes counted (the shortfall of each graded standard open again): ${JSON.stringify(sbg)}`);
   // the Grades page lists the same assignments, and they open the same way the course page's do
   const gpaRow = await page.$eval('.bcv-gpa-detail__arow', (e) => ({ tag: e.tagName, href: e.getAttribute('href'), name: e.querySelector('.bcv-gpa-detail__aname')?.textContent }));
   check(gpaRow.tag === 'A' && /\/courses\/\d+\/assignments\/\d+$/.test(gpaRow.href || ''), `a row on the Grades page opens the assignment it is about: ${JSON.stringify(gpaRow)}`);
@@ -3416,15 +3460,15 @@ try {
   check(!(await page.$('.bcv-sb__zipgo')), 'an assignment that takes no .zip offers no Submit as ZIP, two files or not (2.99.71)');
   await page.click('.bcv-sb__files .bcv-sb__file:nth-child(2) .bcv-sb__preview');
   await page.waitForFunction(() => document.querySelector('.bcv-viewer img.bcv-viewer__img')?.naturalWidth === 1, null, { timeout: 5000 });
-  const pv = await page.evaluate(() => { const v = document.querySelector('.bcv-viewer'); const img = v.querySelector('img.bcv-viewer__img'); return { title: v.querySelector('.bcv-sheet__title').textContent, note: v.querySelector('.bcv-sheet__note').textContent, blob: img.src.startsWith('blob:'), acts: [...v.querySelectorAll('.bcv-viewer__acts .bcv-btn')].map((b) => b.textContent.trim()) }; });
-  check(pv.title === 'figure.png' && /^Image · \d+ B · not handed in yet$/.test(pv.note) && pv.blob && pv.acts.join(',') === 'Open in new tab', `Preview shows the picture itself, read from this device, with no Canvas actions: ${JSON.stringify(pv)}`);
+  const pv = await page.evaluate(() => { const v = document.querySelector('.bcv-viewer'); const img = v.querySelector('img.bcv-viewer__img'); return { title: v.querySelector('.bcv-sheet__title').textContent, note: v.querySelector('.bcv-sheet__note').textContent, blob: img.src.startsWith('blob:'), acts: [...v.querySelectorAll('.bcv-viewer__acts .bcv-btn:not(.bcv-viewer__fs)')].map((b) => b.textContent.trim()), fs: v.querySelector('.bcv-viewer__acts .bcv-viewer__fs')?.getAttribute('aria-label') || null }; });
+  check(pv.title === 'figure.png' && /^Image · \d+ B · not handed in yet$/.test(pv.note) && pv.blob && pv.acts.join(',') === 'Open in new tab' && pv.fs === 'Full screen', `Preview shows the picture itself, read from this device, with no Canvas actions: ${JSON.stringify(pv)}`);
   await shot(page, '20b-preview-before-submit');
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-viewer-ov'), null, { timeout: 3000 });
   check(!!(await page.$('.bcv-sheet-ov--card .bcv-hand')), 'closing the preview leaves the panel open (the viewer took its own Escape)');
   await page.click('.bcv-sb__files .bcv-sb__file:nth-child(1) .bcv-sb__preview');
   await page.waitForSelector('.bcv-viewer .bcv-viewer__none', { timeout: 10000 });
-  check(/This document could not be opened here\./.test((await texts('.bcv-viewer__none'))[0]) && !(await page.$('.bcv-viewer__none a')) && !(await page.$('.bcv-viewer__acts .bcv-btn')), 'a Word file that is no Word document inside says it could not be opened — and no Download or Open in Canvas for a file that is not there yet');
+  check(/This document could not be opened here\./.test((await texts('.bcv-viewer__none'))[0]) && !(await page.$('.bcv-viewer__none a')) && !(await page.$('.bcv-viewer__acts .bcv-btn:not([hidden])')), 'a Word file that is no Word document inside says it could not be opened — and no Download or Open in Canvas for a file that is not there yet');
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.bcv-viewer-ov'), null, { timeout: 3000 });
   await page.click('.bcv-sb__files .bcv-sb__file:nth-child(2) .bcv-sb__x');

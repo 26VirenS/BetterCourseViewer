@@ -50,6 +50,8 @@
     link: 'M10 14a3.5 3.5 0 005 0l4-4a3.5 3.5 0 00-5-5l-1 1M14 10a3.5 3.5 0 00-5 0l-4 4a3.5 3.5 0 005 5l1-1',
     modules: 'M4 6h16M4 12h16M4 18h16M4 6h.01M4 12h.01M4 18h.01',
     external: 'M14 4h6v6M20 4l-9 9M19 14v5H5V5h5',
+    expand: 'M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5', // (2.99.152) the file viewer's Full Screen
+    shrink: 'M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5',
     plus: 'M12 5v14M5 12h14',
     reply: 'M9 7L4 12l5 5M4 12h11a5 5 0 015 5v2',
     copy: 'M9 9h11v11H9zM5 15V4h11',

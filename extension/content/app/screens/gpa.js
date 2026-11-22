@@ -247,7 +247,7 @@
    *  must average to land a target. Counts only work that moves the final
    *  grade (no 0-point or "not counted" items), and follows the course's
    *  group weights when it uses them. */
-  function courseMath(groupsRaw, weighted, own = null) {
+  function courseMath(groupsRaw, weighted, own = null, retake = null) {
     const isGraded = (a) => a.submission?.workflow_state === 'graded' && a.submission.score !== null && a.submission.score !== undefined;
     const byOwn = !!(own && Object.keys(own).length); // (2.98.59: the student's own weights, from the syllabus, in place of Canvas's)
     const groups = (groupsRaw || []).map((g) => {
@@ -255,18 +255,25 @@
       const tot = items.reduce((s, a) => s + Number(a.points_possible), 0);
       const earned = items.filter(isGraded).reduce((s, a) => s + Number(a.submission.score), 0);
       const rem = items.filter((a) => !isGraded(a)).reduce((s, a) => s + Number(a.points_possible), 0);
-      return { weight: byOwn ? (Number(own[String(g.id)]) || 0) : (Number(g.group_weight) || 0), tot, earned, rem };
+      // (2.99.152) a group whose graded work can still be raised — a standard retaken on a later exam (SR-MWJX45N1-X2TW):
+      // what each graded piece is short of full marks is still open, as the work not yet graded is
+      const short = retake?.has(String(g.id)) ? items.filter(isGraded).reduce((s, a) => s + Math.max(0, Number(a.points_possible) - Number(a.submission.score)), 0) : 0;
+      return { weight: byOwn ? (Number(own[String(g.id)]) || 0) : (Number(g.group_weight) || 0), tot, earned, rem, open: rem + short };
     }).filter((g) => g.tot > 0);
     const share = (g) => (weighted || byOwn ? g.weight : g.tot);
     const W = groups.reduce((s, g) => s + share(g), 0);
     // final = base + slope × (fraction scored on the remaining work)
     const base = W > 0 ? groups.reduce((s, g) => s + share(g) * (g.earned / g.tot), 0) / W : 0;
     const slope = W > 0 ? groups.reduce((s, g) => s + share(g) * (g.rem / g.tot), 0) / W : 0;
+    // (2.99.152) the same with what retakes can still gain counted in: what the target asks of the points still open
+    const slopeOpen = W > 0 ? groups.reduce((s, g) => s + share(g) * (g.open / g.tot), 0) / W : 0;
     return {
       known: groups.length > 0,
       earned: groups.reduce((s, g) => s + g.earned, 0),
       remaining: groups.reduce((s, g) => s + g.rem, 0),
-      needed: (targetPct) => (slope > 0 ? ((targetPct / 100 - base) / slope) * 100 : null), // % of the remaining points
+      open: groups.reduce((s, g) => s + g.open, 0),
+      retaking: groups.some((g) => g.open > g.rem),
+      needed: (targetPct) => (slopeOpen > 0 ? ((targetPct / 100 - base) / slopeOpen) * 100 : null), // % of the points still open (the remaining work, and what retakes can still gain)
       project: (fraction) => (base + slope * Math.max(0, Math.min(1, fraction))) * 100, // the course's final % when the remaining work scores this fraction
       slope,
     };
@@ -307,13 +314,17 @@
 
     introIfFirst(ctx.app).catch(() => {}); // the first opening: the tour's steps, waiting for the cards as they draw
     await loadScales(); // (2.99.27) each course's own grading scale, where entered
-    const [all, term, trackingPref, goalPref, targetsPref, snapsPref, hiddenPref, whatIfPref, ownPref] = await Promise.all([
+    const [all, term, trackingPref, goalPref, targetsPref, snapsPref, hiddenPref, whatIfPref, ownPref, retakesPref] = await Promise.all([
       store.courses({ maxAge: store.freshness.grades }).catch(() => null), store.currentTerm().catch(() => ''), // never a score older than the freshness: a tool may have posted one since
-      store.pref('gpaTracking'), store.pref('gpaGoal'), store.pref('gradeTargets'), store.pref('gpaSnapshots'), store.pref('gpaHidden'), store.pref('whatIfScores', true), store.pref('gradeWeights'),
+      store.pref('gpaTracking'), store.pref('gpaGoal'), store.pref('gradeTargets'), store.pref('gpaSnapshots'), store.pref('gpaHidden'), store.pref('whatIfScores', true), store.pref('gradeWeights'), store.pref('gradeRetakes'),
     ]);
     // (2.98.59) a course's own weights, set on its Grades tab: its score here is worked out by them, not Canvas's
     const ownW = ownPref && typeof ownPref === 'object' ? ownPref : {};
     const ownFor = (c) => (ownW[c.id] && typeof ownW[c.id] === 'object' && Object.keys(ownW[c.id]).length ? ownW[c.id] : null);
+    // (2.99.152) the groups of each course whose graded work can still be raised (a course sheet's Can be retaken): the
+    // target counts what is left to gain on them as still open
+    const retakes = retakesPref && typeof retakesPref === 'object' ? { ...retakesPref } : {};
+    const retakeFor = (c) => new Set((Array.isArray(retakes[c.id]) ? retakes[c.id] : []).map(String));
     if (!ctx.alive()) return screen;
     if (!all) {
       body.replaceChildren(U.errorBox('Your courses could not be loaded.'));
@@ -370,7 +381,7 @@
         const canvasLetter = op === null && !hasScale(c.id) ? c.grade : null;
         const letter = canvasLetter ? String(canvasLetter).replace(/-/g, '−') : letterFor(pct, S)[0];
         const pts = pointsFor(canvasLetter, pct, S);
-        const m = courseMath(groupsBy.get(c.id), c.weighted, ownFor(c));
+        const m = courseMath(groupsBy.get(c.id), c.weighted, ownFor(c), retakeFor(c));
         const found = S.findIndex((s) => live(s) && norm(s[0]) === norm(letter));
         const defaultIdx = found >= 0 ? found : S.indexOf(letterFor(pct, S));
         const saved = targetIndex(targets[c.id]);
@@ -403,8 +414,8 @@
     const needText = (r) => (!r.m.known ? 'Target maths needs the course’s assignment list'
       : r.met ? 'Target already secured'
         : r.needed === null ? 'Not reachable — nothing left to grade'
-          : r.reachable ? `Needs ${Math.max(0, Math.round(r.needed))}% of the remaining ${store.fmtPts(r.m.remaining)} pts`
-            : `Not reachable — would need ${Math.round(r.needed)}%`);
+          : r.reachable ? (r.m.retaking ? `Needs ${Math.max(0, Math.round(r.needed))}% of the ${store.fmtPts(r.m.open)} pts still open, retakes included` : `Needs ${Math.max(0, Math.round(r.needed))}% of the remaining ${store.fmtPts(r.m.remaining)} pts`)
+            : `Not reachable — would need ${Math.round(r.needed)}%${r.m.retaking ? ', even with retakes' : ''}`);
     const needClass = (r) => (r.met ? 'bcv-gpa__need--met' : !r.reachable ? 'bcv-gpa__need--no' : '');
 
     /** One snapshot a day while tracking is on; today's is kept current. */
@@ -764,6 +775,18 @@
         paint();
         ov.focus(); // the stepper that had focus was just redrawn; keep Escape working
       }
+      /** (2.99.152) A group's Can be retaken, switched: its graded work counted as still open in the target (or not). */
+      function toggleRetake(g) {
+        const set = retakeFor(c);
+        const id = String(g.id);
+        if (set.has(id)) set.delete(id); else set.add(id);
+        if (set.size) retakes[c.id] = [...set]; else delete retakes[c.id];
+        store.setPref('gradeRetakes', retakes).catch(() => {});
+        current = model();
+        draw();
+        paint();
+        sheet.querySelector(`.bcv-gpa-detail__rchip[data-group="${CSS.escape(id)}"]`)?.focus();
+      }
       // a score typed, then a press elsewhere in the sheet (its X, a letter, another field): the field's
       // change comes with the press, and a repaint then would swap the thing pressed out from under the
       // pointer — its click lost. The repaint waits for the press to end (after its click).
@@ -829,11 +852,31 @@
           U.text('bcv-gpa-detail__gweight', u.weightText ? `${u.weightText} of grade · nothing graded` : 'nothing graded', 'span'),
           U.text('bcv-gpa-detail__gpct', '—', 'span'),
         ], U.groupAttrs(u.id, null, { pick: true, name: u.name })));
+        // (2.99.152) the groups with graded work, each a switch: its graded work can still be raised (a standard retaken on a
+        // later exam), and the target counts what is left to gain on it. A group of standards ("Standard 4") not switched on
+        // is pointed out under them (SR-MWJX45N1-X2TW)
+        const rset = retakeFor(c);
+        // (only a group a retake could change: one that counts — not "not weighted" in a weighted course — with graded work
+        // short of full marks; one switched on stays offered, so it can be switched off)
+        const countsFor = (g) => (ownFor(c) ? Number(ownFor(c)[String(g.id)]) > 0 : !c.weighted || Number(g.group_weight) > 0);
+        const lostIn = (g) => (g.assignments || []).some((a) => Number(a.points_possible) > 0 && !a.omit_from_final_grade && a.submission?.workflow_state === 'graded' && a.submission.score !== null && a.submission.score !== undefined && Number(a.submission.score) < Number(a.points_possible));
+        const rgroups = r ? (groupsBy.get(c.id) || []).filter((g) => rset.has(String(g.id)) || (countsFor(g) && lostIn(g))) : [];
+        const standardsLike = (g) => (g.assignments || []).filter((a) => /^\s*(learning\s+)?standard\s*#?\s*\d/i.test(a.name || '')).length >= 2;
+        const hintG = rgroups.find((g) => standardsLike(g) && !rset.has(String(g.id)));
+        const retakeRow = rgroups.length ? U.el('bcv-gpa-detail__retakes', [
+          U.text('bcv-gpa-detail__rlabel', 'Can be retaken', 'span'),
+          ...rgroups.map((g) => {
+            const on = rset.has(String(g.id));
+            return h('button', { type: 'button', class: `bcv-gpa-detail__rchip ${on ? 'is-on' : ''}`, 'data-group': String(g.id), 'aria-pressed': String(on), title: on ? `${g.name}: graded work counted as still open` : `Count ${g.name}'s graded work as still open (it can be retaken)`, text: g.name, onclick: () => toggleRetake(g) });
+          }),
+        ]) : null;
+        const retakeNote = hintG ? U.text('bcv-gpa-detail__note', `${hintG.name} looks like standards. If they can be retaken on a later exam, switch on ${hintG.name} above: the target then counts what you can still gain on them.`) : null;
         const byGroup = U.el('bcv-gpa-detail__sec', [
           U.text('bcv-gpa__kicker2', 'By group', 'span'),
           ...groupRows, ...ungradedRows,
           groupRows.length || ungradedRows.length ? null : U.text('bcv-gpa-detail__note', 'No assignment groups in this course.'),
           U.text(`bcv-gpa-detail__need bcv-pretty ${r ? needClass(r) : ''}`, r ? needText(r) : 'Nothing graded yet — no score to project from'),
+          retakeRow, retakeNote,
         ]);
         const weights = gm.weighted
           ? U.el('bcv-gpa-detail__sec bcv-gpa-detail__sec--line', [

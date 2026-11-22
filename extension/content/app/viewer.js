@@ -102,10 +102,35 @@
   const docview = () => (BCV.docview ? Promise.resolve(BCV.docview) : BCV.lazy?.load ? BCV.lazy.load('docview').then(() => BCV.docview) : Promise.reject(new Error('no loader')));
 
   let current = null; // { ov, restore, view }
+  // (2.99.152) Full Screen (SR-MWJXEQJL-EN9W): the viewer's sheet, the file and its bar, filling the screen — as Canvas's
+  // own viewer's expand button does — and back with the same button or Escape
+  let fsLeftAt = 0;
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement) fsLeftAt = Date.now();
+    for (const b of document.querySelectorAll('.bcv-viewer__fs')) paintFs(b);
+  });
+  function paintFs(b) {
+    const on = !!document.fullscreenElement && document.fullscreenElement === b.closest('.bcv-viewer');
+    const label = on ? 'Exit full screen' : 'Full screen';
+    b.replaceChildren(U.svg(on ? IC.shrink : IC.expand, { size: 15, stroke: 'currentColor', width: 2 }));
+    b.title = label;
+    b.setAttribute('aria-label', label);
+    b.setAttribute('aria-pressed', String(on));
+  }
+  function fullScreenButton(sheet) {
+    if (!document.fullscreenEnabled || !sheet.requestFullscreen) return null;
+    const b = h('button', { type: 'button', class: 'bcv-btn bcv-viewer__fs', onclick: () => {
+      if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+      else sheet.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
+    } });
+    paintFs(b);
+    return b;
+  }
   function close({ now = false } = {}) {
     if (!current) return;
     const { ov, restore, view } = current;
     current = null;
+    if (document.fullscreenElement && ov.contains(document.fullscreenElement)) document.exitFullscreen?.().catch(() => {});
     try { view?.destroy?.(); } catch { /* gone */ }
     if (now) ov.remove(); else U.dismiss(ov); // (a file opened over another: the old sheet goes at once, the new one rises in its place)
     try { restore?.focus?.(); } catch { /* it may be gone */ }
@@ -136,7 +161,8 @@
     sheet.append(head, body);
     ov.append(sheet);
     ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
-    ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } });
+    // (2.99.152) Escape in full screen is the browser's, to leave it: the viewer stays open under it
+    ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); if (document.fullscreenElement || Date.now() - fsLeftAt < 400) return; close(); } });
     current = { ov, restore: from && from.focus ? from : document.activeElement };
     document.body.append(ov);
     if (from) U.morphFrom(sheet, from);
@@ -169,14 +195,17 @@
       ? U.btn('Open in new tab', { cls: 'bcv-viewer__tab', icon: IC.external || IC.link || IC.doc, iconSize: 13, title: 'Open in a new tab', onClick: () => openInTab(f, name) })
       : h('a', { class: 'bcv-btn bcv-viewer__tab', href: `${canvasPage(f, context)}?bcv=native`, target: '_blank', rel: 'noopener', title: 'Open in a new tab', text: 'Open in new tab' });
     if (newTab.tagName === 'A') newTab.prepend(U.svg(IC.external || IC.link || IC.doc, { size: 13, stroke: 'currentColor', width: 1.9 }));
+    const fsBtn = fullScreenButton(sheet);
     head.replaceChildren(
       U.tile(k.icon, { color: pal.text, tint: pal.tint, size: 32, iconSize: 16 }),
       U.el('bcv-sheet__titles', [U.text('bcv-sheet__title', name), U.text('bcv-sheet__note', note)]),
-      U.el('bcv-viewer__acts', f.local ? [SHOWABLE.includes(k.kind) ? newTab : null] : [newTab, download]),
+      U.el('bcv-viewer__acts', f.local ? [fsBtn, SHOWABLE.includes(k.kind) ? newTab : null] : [fsBtn, newTab, download]),
       closeBtn,
     );
 
-    const none = (why) => U.el('bcv-viewer__none', [
+    // (nothing to show: nothing to fill the screen with either)
+    const none = (why) => { if (fsBtn) fsBtn.hidden = true; return noneEl(why); };
+    const noneEl = (why) => U.el('bcv-viewer__none', [
       U.tile(k.icon, { color: pal.text, tint: pal.tint, size: 32, iconSize: 16 }),
       h('div', { text: why }),
       f.local ? null : h('a', { class: 'bcv-btn bcv-btn--primary', href: f.url, download: f.filename || name, text: 'Download' }),

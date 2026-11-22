@@ -2403,6 +2403,13 @@ html[data-bcv-theme="dark"] .bcv-gpa__need--no { color: #ff8098; }
 .bcv-gpa-detail__gpct { flex: none; min-width: 44px; text-align: right; font: 600 13px/1.2 var(--bcv-font); }
 .bcv-gpa-detail__need { margin: 2px 0 0; font: 500 11.5px/1.4 var(--bcv-font); color: var(--bcv-ink3); }
 .bcv-gpa-detail__note { margin: 0; font: 400 11.5px/1.45 var(--bcv-font); color: var(--bcv-ink3); }
+/* (2.99.152) Can be retaken: a group's graded work counted as still open in the target (a standard retaken on a later exam) */
+.bcv-gpa-detail__retakes { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 2px; }
+.bcv-gpa-detail__rlabel { margin-right: 2px; font: 500 11.5px/1.2 var(--bcv-font); color: var(--bcv-ink3); }
+.bcv-gpa-detail__rchip { padding: 4px 10px; border: 1px solid var(--bcv-sep); border-radius: 999px; background: transparent; color: var(--bcv-ink2); font: 600 11.5px/1.2 var(--bcv-font); cursor: pointer; transition: background .15s ease, color .15s ease, border-color .15s ease; }
+.bcv-gpa-detail__rchip.is-on { background: var(--bcv-blue-soft); border-color: transparent; color: var(--bcv-blue); }
+@media (hover: hover) and (pointer: fine) { .bcv-gpa-detail__rchip:not(.is-on):hover { background: var(--bcv-fill); } }
+.bcv-gpa-detail__rchip:focus-visible { outline: 2px solid var(--bcv-blue); outline-offset: 2px; }
 /* (2.99.27) a course's grading scale, as its instructor set it: a cutoff per letter */
 .bcv-scale__toggle { margin-left: 8px; padding: 3px 10px; border: 0; border-radius: 999px; background: var(--bcv-chip, rgba(127,127,127,.14)); color: var(--bcv-ink1); font: 600 11.5px/1.2 var(--bcv-font); cursor: pointer; }
 .bcv-scale__fold { margin-top: -8px; } /* (the section's gap goes inside it, so shut it takes no room: ui.collapsible) */
@@ -4300,6 +4307,11 @@ html.bcv-phone .bcv-nf__act { margin-left: auto; }
 .bcv-viewer__acts { display: flex; align-items: center; gap: 8px; flex: none; }
 .bcv-viewer__dl, .bcv-viewer__tab { text-decoration: none; }
 .bcv-viewer__tab { display: inline-flex; align-items: center; gap: 6px; }
+/* (2.99.152) Full Screen: a square button by Open in new tab; in full screen the sheet is the whole screen */
+.bcv-viewer__fs { width: 38px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+.bcv-viewer__fs[hidden] { display: none; }
+.bcv-viewer:fullscreen { width: 100vw; height: 100vh; max-width: none; max-height: none; border-radius: 0; margin: 0; box-shadow: none; }
+.bcv-viewer:fullscreen::backdrop { background: var(--bcv-bg, #000); }
 .bcv-viewer__body { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; background: var(--bcv-fill); overflow: auto; position: relative; }
 .bcv-viewer__img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
 .bcv-viewer__frame { width: 100%; height: 100%; border: 0; background: #fff; display: block; }
