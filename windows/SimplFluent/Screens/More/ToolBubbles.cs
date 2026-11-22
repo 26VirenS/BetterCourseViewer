@@ -130,8 +130,8 @@ internal static class ToolLogos
 
 /// <summary>A tool's logo found on its own site, as a browser finds a site's icon: the icons its home page names (<c>&lt;link
 /// rel=icon&gt;</c>, <c>apple-touch-icon</c>), those its web manifest names, then <c>/apple-touch-icon.png</c> and
-/// <c>/favicon.ico</c> — the sharpest of them, tried on the tool's host, then on its site's own domain. Under 48 pixels is
-/// too blurred to use.</summary>
+/// <c>/favicon.ico</c> — the sharpest of them, tried on the tool's host, then on its site's own domain, then on the site it
+/// sends its visitors on to. Under 48 pixels is too blurred to use.</summary>
 internal static class LogoFinder
 {
     private static readonly HttpClient Http = MakeClient();
@@ -149,14 +149,22 @@ internal static class LogoFinder
 
     public static async Task<BitmapSource?> Find(string host)
     {
-        var site = Domain(host);
-        var sites = new List<string> { host };
-        if (site != host) { sites.Add(site); sites.Add("www." + site); }
+        var sites = new List<string>();
+        void Add(string h)
+        {
+            var site = Domain(h);
+            foreach (var s in new[] { h, site, "www." + site }) if (!sites.Contains(s) && sites.Count < 6) sites.Add(s);
+        }
+        Add(host);
         var seen = new HashSet<string>();
         BitmapSource? best = null;
-        foreach (var s in sites.Distinct())
+        for (var next = 0; next < sites.Count; next++)
         {
+            var s = sites[next];
             if (!Uri.TryCreate($"https://{s}/", UriKind.Absolute, out var start) || await Get(start) is not { } page) continue;
+            // (a site that sends its visitors on to another — session.masteringphysics.com to pearson.com — has that one's
+            //  icons tried too)
+            if (!string.Equals(page.Url.Host, s, StringComparison.OrdinalIgnoreCase)) Add(page.Url.Host.ToLowerInvariant());
             var html = System.Text.Encoding.UTF8.GetString(page.Data, 0, Math.Min(page.Data.Length, 800_000));
             foreach (var c in (await Candidates(html, page.Url)).Take(6))
             {
