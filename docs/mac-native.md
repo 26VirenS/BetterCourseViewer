@@ -563,6 +563,20 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   tool with its site, where it is found, and a button for each course it is in, opening it there (by its tab, else an
   assignment, else a module item; Knewton Alta and Macmillan in their own popups). A filter on the page narrows them
   (not a toolbar search field: the window's toolbar has the app's own, and a second one crashed it).
+  (1.3.222) The cards are bubbles in a honeycomb, as the watch's apps are (`ToolBubbles.swift`): the tool needed soonest
+  in the middle, then those with something missing, then the rest, in rings outward, each ring's bubbles smaller (100%,
+  86%, 74%…); rows as wide as the page has room for, the whole drawn smaller on a narrow window (down to 62%). A bubble
+  is filled with its tool's colour, taken from the logo on its site (`ToolLogos`: the icons its home page and web
+  manifest name, then `/apple-touch-icon.png` and `/favicon.ico`, on its host and then its domain; the sharpest, at
+  least 48 pixels; kept in the app's caches, found again after 30 days, a miss after 3): a mark on a coloured square
+  takes the square's colour, any other the strongest hue in it that white can sit on, deepened until white on it reads.
+  The mark sits on it in white, cut to its edges (a line of writing under it, Gradescope's, left out); a logo that is a
+  picture (ALEKS's chart) shows as it is in a small round window; no logo, its first letter on its course's colour. Its
+  name runs along its lower edge (`CurvedName`, a letter at a time, sized down to fit 148° of the circle), in the system
+  font. A badge says how many are still to do (else how many are missing): red with something missing, orange with
+  something due today, blue otherwise. A press opens the tool's list in a square popup, 560 points a side, its bubble in
+  the head; a course's own tab is a row of its own at the top of that course's places (the cards' chips before); a tool
+  that is one course's tab and nothing else opens it at once.
   (1.3.79) A tool is its provider (hub.js `providerOf`, its `PROVIDERS` table: a provider's id, name, icon word, hosts
   and names): every assignment, module item and tab that opens Macmillan Learning — lmslink.bfwpub.com, Achieve, Sapling
   — is one card, "Macmillan Learning", each place under its own title ("W2: Atoms and Elements", "W7 Homework") in its

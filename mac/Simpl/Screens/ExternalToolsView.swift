@@ -60,12 +60,12 @@ struct ExternalToolsData: Codable {
 /// is found, and each course it is in, a press away (Knewton Alta in its own popup, the rest in the
 /// tool window). A filter narrows them by name, site or course.
 ///
-/// (1.3.77) The cards stand in columns of their own heights (`ExternalToolColumns`), each in the shortest column so far, so a short
-/// card beside a tall one leaves no hole under it; a long course name is cut short inside its chip. A tool used in
-/// assignments or module items is a card that is a button as a whole: it says the next of them still to do and how many
-/// there are, and a press opens the list of every one of them beside it (`ToolPlacesList`), to choose the one to open —
-/// before, only the first in each course could be reached. A tool that is a course's own tab keeps a chip for each such
-/// course, which opens the tab itself.
+/// (1.3.77) A press on a tool opens the list of every place it is used (`ToolPlacesList`), to choose the one to open.
+///
+/// (1.3.222) The tools are bubbles in a honeycomb, as the watch's apps are (ToolBubbles.swift): the one needed soonest in
+/// the middle, the rest in rings round it; each filled with its tool's colour from the logo on its site, the logo's mark
+/// in white on it and its name along its lower edge; a badge says how many are still to do. A press opens the tool's
+/// list in a square popup — its courses' own tabs first, then its assignments and module items (the cards' chips before).
 struct ExternalToolsView: View {
     @EnvironmentObject private var engine: Engine
     @StateObject private var model = Loader<ExternalToolsData>()
@@ -78,6 +78,8 @@ struct ExternalToolsView: View {
     /// and AppKit stopped the app (more passes laying it out than it has views; 1.3.175's dark-36b picture). (1.3.204:
     /// kept for the popup, so the list does not change under the pointer.)
     @State private var held: ExternalToolsData?
+    /// (1.3.222) The tools' logos, for the open list's colour.
+    @ObservedObject private var logos = ToolLogos.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// What the cards are drawn from: the latest answer, or while a list is open the one it opened from.
@@ -92,32 +94,7 @@ struct ExternalToolsView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .background(PageGround())
                 } else {
-                    Page {
-                        HStack(alignment: .bottom, spacing: 16) {
-                            ScreenHeading(title: "External Tools", sub: d.sub ?? "")
-                            Spacer(minLength: 12)
-                            // (the filter on the page: the window's toolbar already has the app's own search field)
-                            HStack(spacing: 6) {
-                                Image(systemName: "line.3.horizontal.decrease").foregroundStyle(.secondary)
-                                TextField("Filter tools", text: $query).textFieldStyle(.plain).frame(width: 180)
-                            }
-                            .padding(.horizontal, 12)
-                            .frame(height: 32)
-                            .background(Color.primary.opacity(0.06), in: Capsule())
-                        }
-                        let shown = filtered(d.rows)
-                        if shown.isEmpty {
-                            Text("No tool matches “\(query)”.").font(.sBody).foregroundStyle(.secondary)
-                        } else {
-                            // (1.3.77) columns of their own heights, not rows as tall as their tallest card: plain stacks side
-                            // by side, each card put in the column with least in it (a popover would not show from a card
-                            // placed by a Layout of the app's own)
-                            ExternalToolColumns(tools: shown) { t in
-                                ToolCard(tool: t, listed: listedBinding(t), openTab: { c in open(t, in: c) })
-                            }
-                            .animation(reduceMotion ? nil : Motion.gentle, value: shown.map(\.id))
-                        }
-                    }
+                    bubblePage(d)
                 }
             } else {
                 LoadState(error: model.error) { Task { await load() } }
@@ -139,6 +116,90 @@ struct ExternalToolsView: View {
         }
     }
 
+    /// (1.3.222) The page: its heading and filter, and under them the tools as bubbles in a honeycomb (ToolBubbles.swift),
+    /// the one needed next in the middle — centred in the room the window leaves, scrolling when there are more than fit.
+    private func bubblePage(_ d: ExternalToolsData) -> some View {
+        GeometryReader { g in
+            let pad: CGFloat = g.size.width < 700 ? 22 : 40
+            let room = max(0, min(1480, g.size.width - pad * 2))
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
+                    HStack(alignment: .bottom, spacing: 16) {
+                        ScreenHeading(title: "External Tools", sub: d.sub ?? "")
+                        Spacer(minLength: 12)
+                        // (the filter on the page: the window's toolbar already has the app's own search field)
+                        HStack(spacing: 6) {
+                            Image(systemName: "line.3.horizontal.decrease").foregroundStyle(.secondary)
+                            TextField("Filter tools", text: $query).textFieldStyle(.plain).frame(width: 180)
+                        }
+                        .padding(.horizontal, 12)
+                        .frame(height: 32)
+                        .background(Color.primary.opacity(0.06), in: Capsule())
+                    }
+                    let shown = specs(filtered(d.rows))
+                    if shown.isEmpty {
+                        Text("No tool matches “\(query)”.").font(.sBody).foregroundStyle(.secondary)
+                    } else {
+                        ToolBubbleField(specs: shown, width: room, lit: listed) { id in press(id, in: d) }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                }
+                .frame(maxWidth: 1480, alignment: .leading)
+                .padding(.horizontal, pad)
+                .padding(.top, 26)
+                .padding(.bottom, 40)
+                .frame(maxWidth: .infinity, minHeight: g.size.height, alignment: .top)
+            }
+        }
+        .background(PageGround())
+    }
+
+    /// (1.3.222) Each tool as its bubble: the one needed soonest first (the middle), then those with something missing,
+    /// then those with places to choose from, then a course's own tabs — by name within each. Its badge: how many are
+    /// still to do (else how many are missing), red with something missing, orange with something due today.
+    private func specs(_ rows: [ExternalToolsData.Tool]) -> [BubbleSpec] {
+        let ranked = rows.map { t -> (t: ExternalToolsData.Tool, group: Int, due: Date) in
+            let due = t.nextDue
+            let group = due != nil ? 0 : t.missingCount > 0 ? 1 : t.places.isEmpty ? 3 : 2
+            return (t, group, due ?? .distantFuture)
+        }
+        .sorted { a, b in
+            if a.group != b.group { return a.group < b.group }
+            if a.due != b.due { return a.due < b.due }
+            return a.t.name.localizedCaseInsensitiveCompare(b.t.name) == .orderedAscending
+        }
+        return ranked.map { x in
+            let t = x.t
+            let toDo = t.toDoCount, missing = t.missingCount
+            let tone: BubbleTone = missing > 0 ? .late : (x.group == 0 && Calendar.current.isDateInToday(x.due) ? .today : .plain)
+            // (a tool that is only courses' tabs has nothing to choose but the course)
+            let onlyTabs = !t.places.contains { $0.item.kind != "tab" }
+            var help = onlyTabs ? "Open \(t.name)" : t.chooseHelp
+            if let n = t.nextShown { help = "Next: " + ([n.title, n.line].filter { !$0.isEmpty }.joined(separator: " · ")) }
+            var said = [t.name]
+            if toDo > 0 { said.append("\(toDo) to do") }
+            if missing > 0 { said.append("\(missing) missing") }
+            return BubbleSpec(id: t.id, name: t.name, host: t.host, color: t.courses.first?.color ?? "#8e8e93",
+                              count: toDo > 0 ? toDo : missing, tone: tone, help: help, label: said.joined(separator: ", "))
+        }
+    }
+
+    /// (1.3.222) A bubble pressed: its list of places (and its courses' own tabs) in the square popup — or, a tool that is
+    /// only one course's tab, that tab at once (nothing to choose).
+    private func press(_ id: String, in d: ExternalToolsData) {
+        guard let t = d.rows.first(where: { $0.id == id }) else { return }
+        let places = t.places
+        if places.count == 1, let only = places.first, only.item.kind == "tab" {
+            open(t, in: only.course)
+            return
+        }
+        guard !places.isEmpty else {
+            if let c = t.courses.first { open(t, in: c) }
+            return
+        }
+        listed = id
+    }
+
     /// (1.3.204) The open tool's list in a popup of its own over the page — a little wider than a card, centred, the
     /// page dimmed a touch under it — rather than a popover hanging from its card, cramped by the room under it. It
     /// grows in from just under its size and fades (220 ms, a strong ease-out; a fade alone under Reduce Motion), and
@@ -153,8 +214,8 @@ struct ExternalToolsView: View {
                         .accessibilityHidden(true)
                         .transition(.opacity)
                     let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    ToolPlacesList(tool: t, tint: Color(hex: t.courses.first?.color ?? "#8e8e93"),
-                                   room: max(300, min(720, g.size.height - 56)),
+                    ToolPlacesList(tool: t, tint: listTint(t),
+                                   room: max(300, min(560, g.size.height - 56, g.size.width - 40)),
                                    choose: { c, item in choose(t, c, item) }, close: { listed = nil })
                         .clipShape(shape)
                         .overlay(shape.strokeBorder(Theme.edge, lineWidth: 1).allowsHitTesting(false))
@@ -173,6 +234,12 @@ struct ExternalToolsView: View {
         }
         .allowsHitTesting(listed != nil)
         .animation(reduceMotion ? .easeOut(duration: 0.15) : .timingCurve(0.23, 1, 0.32, 1, duration: 0.22), value: listed)
+    }
+
+    /// (1.3.222) The list's colour: its logo's, else its first course's.
+    private func listTint(_ t: ExternalToolsData.Tool) -> Color {
+        if !t.host.isEmpty, let l = logos.look(t.host), l.kind != .none { return Color(hex: l.brand) }
+        return Color(hex: t.courses.first?.color ?? "#8e8e93")
     }
 
     private var popupArrival: AnyTransition {
@@ -245,6 +312,11 @@ struct ExternalToolsView: View {
     /// window arriving over a list still closing is a stutter).
     private func choose(_ t: ExternalToolsData.Tool, _ c: ExternalToolsData.Course, _ item: ExternalToolsData.Item) {
         listed = nil
+        // (1.3.222: a course's own tab, as its chip on the card opened it)
+        if item.kind == "tab" {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { open(t, in: c) }
+            return
+        }
         // (1.3.101) a Knewton Alta assignment's launch asked of Canvas at once, while the list closes: only its popup waits
         let alta = altaLaunch(t, in: c, item: item)
         if let alta { engine.askAlta(alta) }
@@ -324,6 +396,25 @@ enum ToolOpening {
 
 // MARK: - What a card says
 
+/// (1.3.222) Canvas's dates ("2026-11-23T07:59:00Z", with or without fractions of a second).
+enum ToolDates {
+    private static let plain: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+    private static let fractional: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+
+    static func date(_ s: String?) -> Date? {
+        guard let s, !s.isEmpty else { return nil }
+        return plain.date(from: s) ?? fractional.date(from: s)
+    }
+}
+
 /// (1.3.77) One place a tool is used — an assignment or a module item — and the course it is in.
 private struct ToolPlace: Identifiable {
     let course: ExternalToolsData.Course
@@ -340,9 +431,23 @@ private struct ToolNext {
 }
 
 private extension ExternalToolsData.Tool {
-    /// (1.3.77) Every place it is used, course by course, in the order the answer gives them.
+    /// (1.3.77) Every place it is used, course by course, in the order the answer gives them. (1.3.222) A course it is a
+    /// tab in has that tab first, a row of its own (kind "tab"): its card's chip before.
     var places: [ToolPlace] {
-        courses.flatMap { c in (c.items ?? []).map { ToolPlace(course: c, item: $0) } }
+        courses.flatMap { c -> [ToolPlace] in
+            let tab: [ToolPlace] = c.open["tool"] == nil ? [] : [ToolPlace(course: c, item: ExternalToolsData.Item(
+                kind: "tab", id: c.id, title: "\(name) in \(c.name)", sub: "The course’s own tab, in a Simpl window"))]
+            return tab + (c.items ?? []).map { ToolPlace(course: c, item: $0) }
+        }
+    }
+
+    /// (1.3.222) How many are still to do, and how many are missing.
+    var toDoCount: Int { places.filter { $0.item.upcoming == true }.count }
+    var missingCount: Int { places.filter { $0.item.status?.kind == "bad" }.count }
+
+    /// (1.3.222) When the soonest still to do is due.
+    var nextDue: Date? {
+        places.compactMap { $0.item.upcoming == true ? ToolDates.date($0.item.due) : nil }.min()
     }
 
     /// (1.3.77) Used in assignments or module items: its card opens the list of them.
@@ -379,18 +484,6 @@ private extension ExternalToolsData.Tool {
         }
     }
 
-    /// Where it was found: how many courses; a course's navigation; (a tool with no list) its assignments, how many,
-    /// and its modules — a list's own foot says how many places it has.
-    var whereFound: String {
-        var parts = [courses.count == 1 ? "1 course" : "\(courses.count) courses"]
-        if kinds.contains("Course navigation") { parts.append("Course navigation") }
-        if !listable {
-            if assignments > 0 { parts.append(assignments == 1 ? "1 assignment" : "\(assignments) assignments") }
-            if kinds.contains("Modules") { parts.append("Modules") }
-        }
-        return parts.joined(separator: " · ")
-    }
-
     /// (1.3.77) The next still to do: "Unit 2" (courses-26: under the tool's own name, without it again), "Due Oct 18
     /// at 11:59 PM · F26-SPRK 010 103".
     var nextShown: ToolNext? {
@@ -412,205 +505,6 @@ private extension ExternalToolsData.Tool {
     }
 }
 
-// MARK: - The card
-
-/// (1.3.67) A tool's card: its monogram in its first course's colour, its name, its site and where it is found.
-/// A tool found only in courses' navigation has a chip a course, opening its tab there; the card itself is not a button.
-/// (1.3.77) A tool used in assignments or module items is a button as a whole: it gives a little under a press (scale
-/// 0.98, 100 ms), washes under the pointer and while its list is open, says the next still to do and, at its foot, how
-/// many there are; the press opens the list (1.3.204: in a popup over the page). Its chips for a course's own tab (when it
-/// is one too) stay buttons of their own, laid over the card's — never a button inside a button.
-private struct ToolCard: View {
-    let tool: ExternalToolsData.Tool
-    @Binding var listed: Bool
-    let openTab: (ExternalToolsData.Course) -> Void
-    @State private var hover = false
-    @State private var pressed = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private var tint: Color { Color(hex: tool.courses.first?.color ?? "#8e8e93") }
-
-    var body: some View {
-        if tool.listable { listCard } else { tabCard }
-    }
-
-    private var tabCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            header
-            chips(tool.courses)
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .card(radius: 18)
-    }
-
-    private var listCard: some View {
-        let tabs = tool.courses.filter { $0.open["tool"] != nil }
-        return VStack(alignment: .leading, spacing: 12) {
-            // (what it says lets a press through to the card's button under it; the button says it all to VoiceOver)
-            Group {
-                header
-                if let n = tool.nextShown { nextLine(n) }
-            }
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
-            if !tabs.isEmpty { chips(tabs) }
-            footer
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background { revealButton }
-        .modifier(ListCardSurface(lit: hover || listed))
-        .scaleEffect(pressed && !reduceMotion ? 0.98 : 1)
-        .animation(.easeOut(duration: 0.1), value: pressed)
-        .animation(Motion.hover, value: hover || listed)
-        .onHover { hover = $0 }
-    }
-
-    /// The card's own button, the whole card under what it says: it tells the card when it is held, for the card to give.
-    private var revealButton: some View {
-        let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
-        let label: String = "\(tool.name), \(tool.placesPhrase)"
-        var next = ""
-        if let n = tool.nextShown { next = "Next: \(n.title), \(n.line)" }
-        return Button {
-            listed = true
-        } label: {
-            shape.fill(Color.clear).contentShape(shape)
-        }
-        .buttonStyle(PressReport(pressed: $pressed))
-        .help(tool.chooseHelp)
-        .accessibilityLabel(label)
-        .accessibilityValue(next)
-        .accessibilityHint(tool.chooseHelp)
-    }
-
-    private var header: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Text(String(tool.name.prefix(1)).uppercased())
-                .font(.system(size: 19, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: 40, height: 40)
-                .background(tint.gradient, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(tool.name).font(.sHeadline).lineLimit(2)
-                if tool.showsHost {
-                    Text(tool.host).font(.sCaption).foregroundStyle(.secondary).lineLimit(1)
-                }
-                Text(tool.whereFound).font(.sCaption).foregroundStyle(.secondary).lineLimit(2)
-            }
-            Spacer(minLength: 0)
-        }
-    }
-
-    /// (1.3.77) The next still to do, in a well: its course's dot, its title and the Next tag; when it is due, and where.
-    private func nextLine(_ n: ToolNext) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 7) {
-                Circle().fill(Color(hex: n.color)).frame(width: 7, height: 7)
-                Text(n.title).font(.sCallout.weight(.medium)).lineLimit(1)
-                Spacer(minLength: 6)
-                NextTag()
-            }
-            if !n.line.isEmpty {
-                Text(n.line).font(.sCaption).foregroundStyle(.secondary).lineLimit(1).padding(.leading, 14)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.well, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-    }
-
-    /// (1.3.77) The card's foot: how many places it has, and a chevron — there is more inside. (1.3.204: to the right,
-    /// the list opening in a popup of its own, no longer under the card)
-    private var footer: some View {
-        VStack(spacing: 10) {
-            Divider()
-            HStack(spacing: 6) {
-                Text(tool.placesPhrase).font(.sCallout).foregroundStyle(.secondary)
-                Spacer(minLength: 6)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.tertiary)
-            }
-        }
-    }
-
-    /// Each course it is a tab in, opened there. (1.3.77) A long course name is cut short inside its chip (its tooltip
-    /// says it whole). (courses-31) Each ends in the window's symbol, as the course home's More rows do: it opens in a
-    /// Simpl window of its own — ↗ is kept for what leaves for the browser.
-    private func chips(_ courses: [ExternalToolsData.Course]) -> some View {
-        WrapLayout(spacing: 6) {
-            ForEach(courses) { c in
-                Button { openTab(c) } label: {
-                    HStack(spacing: 6) {
-                        Circle().fill(Color(hex: c.color)).frame(width: 7, height: 7)
-                        Text(c.name).font(.sCallout.weight(.medium)).lineLimit(1).truncationMode(.tail)
-                        Image(systemName: "macwindow").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                }
-                .buttonStyle(ChipStyle())
-                .help("Open \(tool.name) in \(c.name)")
-            }
-        }
-    }
-}
-
-/// (1.3.77) A list card's ground: the card's own (glass on macOS 26, the card colour before), washed a little under the
-/// pointer and while its list is open, so the list is seen to come from it.
-private struct ListCardSurface: ViewModifier {
-    let lit: Bool
-
-    func body(content: Content) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
-        if #available(macOS 26.0, *) {
-            content
-                .background(shape.fill(Color.primary.opacity(lit ? 0.04 : 0)))
-                .glassCard(radius: 18)
-        } else {
-            content
-                .background(shape.fill(lit ? Theme.cardHover : Theme.card))
-                .overlay(shape.strokeBorder(Theme.edge, lineWidth: 1).allowsHitTesting(false))
-                .shadow(color: Theme.shadow, radius: 1.5, y: 1)
-        }
-    }
-}
-
-/// (1.3.77) A button that draws its label alone and tells `pressed` while it is held, for what it lies under to give.
-private struct PressReport: ButtonStyle {
-    @Binding var pressed: Bool
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .onChange(of: configuration.isPressed) { _, now in pressed = now }
-    }
-}
-
-/// (1.3.77) A course's chip: a quiet capsule, a little deeper under the pointer and deeper again under a click.
-private struct ChipStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        ChipBody(configuration: configuration)
-    }
-
-    private struct ChipBody: View {
-        let configuration: ButtonStyleConfiguration
-        @State private var hover = false
-
-        var body: some View {
-            configuration.label
-                .background(Color.primary.opacity(configuration.isPressed ? 0.14 : (hover ? 0.1 : 0.07)), in: Capsule())
-                .contentShape(Capsule())
-                .animation(Motion.hover, value: hover)
-                .onHover { hover = $0 }
-        }
-    }
-}
-
 /// (1.3.77) "Next": the place still to do soonest, in its card and in its list.
 private struct NextTag: View {
     var body: some View {
@@ -626,8 +520,9 @@ private struct NextTag: View {
 
 // MARK: - The list of places
 
-/// (1.3.77) Every place a tool is used, to choose the one to open — (1.3.204) in a popup over the page, centred, 600 points
-/// wide (a popover from its card before, cramped by the room under it). One list of them all, in their order — under each
+/// (1.3.77) Every place a tool is used, to choose the one to open — (1.3.204) in a popup over the page, centred (a popover
+/// from its card before, cramped by the room under it). (1.3.222) A square, 560 points a side (less in a small window),
+/// the list scrolling inside it; its head has the tool's bubble. One list of them all, in their order — under each
 /// course's name when there is more than one — as before 1.3.202's To Do and All and its Up Next card (1.3.205: one list
 /// again, the next still to do in it with its Next tag, the highlight starting on it and the list scrolled to it). Its head
 /// is washed in the tool's colour — its tile, its name, its site and how many there are, and how many are still to do; a
@@ -639,7 +534,7 @@ private struct NextTag: View {
 private struct ToolPlacesList: View {
     let tool: ExternalToolsData.Tool
     let tint: Color
-    /// The most the whole popup may be tall: 720 points, or the window's height less a margin.
+    /// (1.3.222) The popup's side: 560 points, or less in a small window.
     let room: CGFloat
     let choose: (ExternalToolsData.Course, ExternalToolsData.Item) -> Void
     let close: () -> Void
@@ -652,15 +547,11 @@ private struct ToolPlacesList: View {
     @State private var lit: Int
     /// Raised by an arrow key: the highlighted place scrolled into view (a place under the pointer already is).
     @State private var keyMoves = 0
-    @State private var listHeight: CGFloat
-    /// (1.3.82) The list's height as last measured, in whole points: taken up as `listHeight` a turn of the run loop
-    /// later, never while the popover is being laid out.
-    @State private var measured: CGFloat = 0
     @FocusState private var focus: Focus?
 
     private enum Focus: Hashable { case filter, list }
 
-    init(tool: ExternalToolsData.Tool, tint: Color, room: CGFloat = 720, choose: @escaping (ExternalToolsData.Course, ExternalToolsData.Item) -> Void, close: @escaping () -> Void) {
+    init(tool: ExternalToolsData.Tool, tint: Color, room: CGFloat = 560, choose: @escaping (ExternalToolsData.Course, ExternalToolsData.Item) -> Void, close: @escaping () -> Void) {
         self.tool = tool
         self.tint = tint
         self.room = room
@@ -672,9 +563,6 @@ private struct ToolPlacesList: View {
         self.nextID = next
         self.toDo = all.filter { $0.item.upcoming == true }.count
         _lit = State(initialValue: all.firstIndex { $0.id == next } ?? 0)
-        // (a first guess at its height, until it is measured: a place a row, a course a heading)
-        let courses = Set(all.map(\.course.id)).count
-        _listHeight = State(initialValue: CGFloat(all.count) * 50 + (courses > 1 ? CGFloat(courses) * 30 : 0) + 16)
     }
 
     private var courseCount: Int { Set(all.map(\.course.id)).count }
@@ -683,19 +571,11 @@ private struct ToolPlacesList: View {
     private var trimmed: String { query.trimmingCharacters(in: .whitespaces) }
     /// "knewton.com · 5 assignments in 2 courses".
     private var summary: String {
-        let places = "\(tool.placesPhrase) in \(courseCount == 1 ? "1 course" : "\(courseCount) courses")"
+        let courses = courseCount == 1 ? "1 course" : "\(courseCount) courses"
+        // (1.3.222: a tool that is only courses' own tabs)
+        let places = all.contains { $0.item.kind != "tab" } ? "\(tool.placesPhrase) in \(courses)" : "Its tab in \(courses)"
         return tool.showsHost ? "\(tool.host) · \(places)" : places
     }
-    /// The list's own height at most: the whole popup no taller than its room (its head, its filter and its foot take
-    /// the rest).
-    private var listMax: CGFloat {
-        let head: CGFloat = 64 + (hasFilter ? 50 : 0) + 30
-        return max(160, room - head)
-    }
-
-    /// The list's height: as tall as it is, up to its most.
-    private var listFrame: CGFloat { min(max(listHeight, 40), listMax) }
-
     /// What the list shows, in its order: all of it, or what the filter's words find.
     private var shown: [ToolPlace] {
         let q = trimmed.lowercased()
@@ -711,10 +591,11 @@ private struct ToolPlacesList: View {
             if hasFilter { filterField }
             Divider()
             list(shown)
+                .frame(maxHeight: .infinity)
             Divider()
             foot
         }
-        .frame(width: 600)
+        .frame(width: min(560, room), height: min(560, room))
         // (solid: the popup over the dimmed page)
         .background(Color(nsColor: .windowBackgroundColor))
         .background { keyHolder }
@@ -734,11 +615,7 @@ private struct ToolPlacesList: View {
     /// of its colour.
     private var header: some View {
         HStack(spacing: 12) {
-            Text(String(tool.name.prefix(1)).uppercased())
-                .font(.system(size: 17, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: 38, height: 38)
-                .background(tint.gradient, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            ToolOrb(name: tool.name, host: tool.host, color: tool.courses.first?.color ?? "#8e8e93", size: 42, named: false)
             VStack(alignment: .leading, spacing: 2) {
                 Text(tool.name).font(.sHeadline).lineLimit(1)
                 Text(summary).font(.sCaption).foregroundStyle(.secondary).lineLimit(1)
@@ -813,22 +690,8 @@ private struct ToolPlacesList: View {
                     }
                 }
                 .padding(8)
-                .background {
-                    GeometryReader { g in Color.clear.preference(key: PlacesListHeightKey.self, value: g.size.height) }
-                }
             }
             .scrollBounceBehavior(.basedOnSize)
-            // (1.3.82: as tall as the list, up to its most)
-            .frame(minHeight: min(160, listFrame), idealHeight: listFrame, maxHeight: listFrame)
-            .onPreferenceChange(PlacesListHeightKey.self) { h in
-                // (measured whole, unfiltered: a filter narrowing the list leaves the popup its size)
-                let whole = h.rounded(.up)
-                if query.isEmpty, abs(whole - measured) > 0.5 { measured = whole }
-            }
-            .task(id: measured) {
-                // (1.3.82: the measure taken up on a later turn of the run loop, and only when it is another by half a point)
-                if measured > 0, abs(measured - listHeight) > 0.5 { listHeight = measured }
-            }
             .task {
                 // (1.3.205: the next still to do in view as the list opens, with what comes before it above)
                 try? await Task.sleep(nanoseconds: 60_000_000)
@@ -890,6 +753,7 @@ private struct ToolPlacesList: View {
     }
 
     private static func markLook(_ p: ToolPlace) -> (symbol: String, tone: String?) {
+        if p.item.kind == "tab" { return ("macwindow", nil) } // (1.3.222: a course's own tab)
         if p.item.kind == "moduleItem" { return ("list.bullet", nil) }
         switch p.item.status?.kind ?? "" {
         case "good": return ("checkmark", "good")
@@ -977,90 +841,3 @@ private struct PlaceRowStyle: ButtonStyle {
     }
 }
 
-private struct PlacesListHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
-}
-
-// MARK: - Layouts
-
-/// (1.3.77) The cards in columns of their own heights, not rows as tall as their tallest card: as many 320pt columns as
-/// the page has room for (Page's width), plain stacks side by side, each card in turn put in the column whose cards are
-/// the shortest so far — reckoned by what each draws: its next, its list's foot, its rows of chips. (A Layout of the
-/// app's own placed them before, and a card's popover would not show from it.)
-private struct ExternalToolColumns<Card: View>: View {
-    let tools: [ExternalToolsData.Tool]
-    @ViewBuilder let card: (ExternalToolsData.Tool) -> Card
-    @Environment(\.pageWidth) private var pageWidth
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 16) {
-            ForEach(Array(columns().enumerated()), id: \.offset) { _, column in
-                VStack(alignment: .leading, spacing: 16) {
-                    ForEach(column) { t in card(t) }
-                }
-                .frame(maxWidth: .infinity, alignment: .top)
-            }
-        }
-    }
-
-    private func columns() -> [[ExternalToolsData.Tool]] {
-        let width = pageWidth ?? 700
-        let count = max(1, min(tools.count, Int((width + 16) / (320 + 16))))
-        var cols = Array(repeating: [ExternalToolsData.Tool](), count: count)
-        var heights = Array(repeating: CGFloat(0), count: count)
-        for t in tools {
-            let tabs = t.courses.filter { $0.open["tool"] != nil }.count
-            let estimate: CGFloat = 90 + (t.listable ? (t.next != nil ? 110 : 50) : 0) + CGFloat((tabs + 1) / 2) * 36
-            let i = heights.indices.min(by: { heights[$0] < heights[$1] }) ?? 0
-            cols[i].append(t)
-            heights[i] += estimate + 16
-        }
-        return cols
-    }
-}
-
-/// Views laid left to right, onto a new line when the next would not fit. (1.3.77) One wider than a whole line is
-/// offered the line's width, and placed at that, so it fits by cutting itself short (a chip's long course name).
-private struct WrapLayout: Layout {
-    var spacing: CGFloat = 6
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let width = proposal.width ?? 320
-        var x: CGFloat = 0, y: CGFloat = 0, line: CGFloat = 0, widest: CGFloat = 0
-        for v in subviews {
-            let s = size(of: v, within: width)
-            if x > 0 && x + s.width > width {
-                x = 0
-                y += line + spacing
-                line = 0
-            }
-            x += s.width + spacing
-            line = max(line, s.height)
-            widest = max(widest, x - spacing)
-        }
-        return CGSize(width: min(width, widest), height: y + line)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var x = bounds.minX, y = bounds.minY, line: CGFloat = 0
-        for v in subviews {
-            let s = size(of: v, within: bounds.width)
-            if x > bounds.minX && x + s.width > bounds.maxX {
-                x = bounds.minX
-                y += line + spacing
-                line = 0
-            }
-            v.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(width: s.width, height: s.height))
-            x += s.width + spacing
-            line = max(line, s.height)
-        }
-    }
-
-    /// A view's own size, or — wider than the line — its size offered the line's width.
-    private func size(of v: LayoutSubview, within width: CGFloat) -> CGSize {
-        let ideal = v.sizeThatFits(.unspecified)
-        guard ideal.width > width else { return ideal }
-        return v.sizeThatFits(ProposedViewSize(width: max(0, width), height: nil))
-    }
-}
