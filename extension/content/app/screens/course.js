@@ -1405,7 +1405,7 @@
         if ((it.type === 'ExternalUrl' || it.type === 'ExternalTool') && BCV.exttool) rowEl.addEventListener('click', (e) => {
           if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
           e.preventDefault();
-          if (it.type === 'ExternalTool') BCV.exttool.open({ title: it.title, url: `${c.url}/external_tools/retrieve?display=borderless&url=${encodeURIComponent(it.external_url || '')}`, page: it.html_url ? (() => { try { return new URL(it.html_url, location.origin).pathname; } catch { return null; } })() : null, from: rowEl });
+          if (it.type === 'ExternalTool') BCV.exttool.openModuleItem({ courseId: c.id, itemId: it.id, title: it.title, from: rowEl }); // (2.99.152: its own launch, the link set up on it)
           else BCV.exttool.open({ title: it.title, url: it.external_url || it.html_url, newTab: it.external_url || it.html_url, from: rowEl, icon: IC.link });
         });
         return rowEl;

@@ -1695,7 +1695,7 @@
   const phFacts = (pairs) => U.el('bcv-ph-facts', pairs.filter(([, v]) => v !== null && v !== undefined && v !== '')
     .map(([k, v]) => h('span', { class: 'bcv-ph-fact' }, [h('b', { text: `${k} ` }), String(v)])));
 
-  async function assignment(ctx, shell, { a, s, types, available, isTool, toolNewTab, toolLaunch, nativeSubmit, canvasOnly, attemptsLeft, status, posted, held, slot, fill }) {
+  async function assignment(ctx, shell, { a, s, types, available, isTool, toolNewTab, toolLaunch, launchTool, nativeSubmit, canvasOnly, attemptsLeft, status, posted, held, slot, fill }) {
     const { app } = ctx;
     const c = shell.course;
     const CS = BCV.screens.course;
@@ -1706,7 +1706,7 @@
     // and Canvas-only cases keep one big button
     const embeds = nativeSubmit && !isTool;
     const primary = isTool
-      ? { label: s.submitted_at || (s.attempt || 0) > 0 ? 'Continue assignment' : 'Start assignment', go: () => (BCV.exttool ? BCV.exttool.open({ title: a.name, url: toolLaunch, newTab: toolLaunch }) : window.open(toolLaunch, '_blank', 'noopener')) }
+      ? { label: s.submitted_at || (s.attempt || 0) > 0 ? 'Continue assignment' : 'Start assignment', go: () => (launchTool ? launchTool() : window.open(toolLaunch, '_blank', 'noopener')) }
       : canvasOnly ? { label: s.submitted_at ? 'Resubmit in Canvas' : 'Submit in Canvas', go: () => app.go(nativeHref(`${c.url}/assignments/${a.id}`)) } : null;
     const block = embeds ? await BCV.screens.submit.render(ctx, c, { embed: true, a, sub: s, back: { href: `${c.url}/assignments`, label: 'Assignments' }, title: 'Submit work', aside: () => rubricButton(a, s) }) : null;
     if (!ctx.alive()) return b;

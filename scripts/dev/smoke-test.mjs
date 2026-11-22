@@ -5421,8 +5421,8 @@ try {
   await knewton.waitForLoadState('domcontentloaded');
   await eventually(async () => !!(await barRead(knewton)), 20000);
   const kn = await barRead(knewton);
-  check(/external_tools\/retrieve\?assignment_id=4003/.test(knewton.url()) && /bcv=tool/.test(knewton.url()) && kn.title === 'Knewton Alta: Unit 2' && page.url().endsWith('/courses/104/assignments/4003'),
-    `Start assignment opens the tool in a tab of its own, Canvas's launch on it, the assignment page staying put: ${JSON.stringify({ url: knewton.url(), title: kn.title })}`);
+  check(knewton.url() === `${BASE}/mock-alta/learn/course/c1/assignment/a1?bcv=tool` && kn.title === 'Knewton Alta: Unit 2' && page.url().endsWith('/courses/104/assignments/4003'),
+    `Start assignment opens the tool in a tab of its own by the assignment's own launch (2.99.152: Canvas's sessionless launch for it, which carries the link set up on it — SR-MWL9MZ14-ACLN), the assignment page staying put: ${JSON.stringify({ url: knewton.url(), title: kn.title })}`);
   // the tool's page is somebody else's and cannot be styled from here, so dark turns it over; the
   // sun in the bar turns it back, and the bar keeps its own colours either way
   await eventually(async () => (await barState(knewton)) === 'ready', 25000);
@@ -5877,12 +5877,12 @@ try {
   await knewTab.waitForLoadState('domcontentloaded').catch(() => {});
   // (Knewton Alta is in two courses: a row for the tool in each, each through that course's assignment nearest its due — SPRK's
   // through Unit 2, not Unit 1 handed in nor Units 3 and 4 further off — then the assignments that are the tool)
-  check(knewTitle === 'Open a tool' && knewRows.length === 7 && knewRows.slice(0, 2).every((r) => r.t === 'Knewton Alta' && r.acts.join() === 'Open tool,Assignment') && knewRows[0].s === 'MATH-021-20 · Tool · via Knewton Alta: Limits Practice' && knewRows[1].s === 'SPRK-010-103 · Tool · via Knewton Alta: Unit 2' && knewRows.some((r) => r.t === 'Knewton Alta: Unit 2' && /^SPRK-010-103 · Assignment tool · due /.test(r.s)) && knewTab.url() === `${BASE}/courses/101/external_tools/retrieve?assignment_id=1090&display=borderless&url=${encodeURIComponent('https://tool.example.com/launch')}&bcv=tool`, `/open lists the tool behind an assignment by its own name, then the assignment that is the tool, under a short title; Enter launches the tool in a tab of its own by Canvas's own launch route: “${knewTitle}” ${JSON.stringify(knewRows)} → ${knewTab.url()}`);
+  check(knewTitle === 'Open a tool' && knewRows.length === 7 && knewRows.slice(0, 2).every((r) => r.t === 'Knewton Alta' && r.acts.join() === 'Open tool,Assignment') && knewRows[0].s === 'MATH-021-20 · Tool · via Knewton Alta: Limits Practice' && knewRows[1].s === 'SPRK-010-103 · Tool · via Knewton Alta: Unit 2' && knewRows.some((r) => r.t === 'Knewton Alta: Unit 2' && /^SPRK-010-103 · Assignment tool · due /.test(r.s)) && knewTab.url() === `${BASE}/mock-alta/learn/course/c1/assignment/a1?bcv=tool`, `/open lists the tool behind an assignment by its own name, then the assignment that is the tool, under a short title; Enter launches the tool in a tab of its own by the assignment's own launch (2.99.152): “${knewTitle}” ${JSON.stringify(knewRows)} → ${knewTab.url()}`);
   await knewTab.close().catch(() => {});
   const modRows = await findRows('/open mastering');
   const [modTab] = await Promise.all([context.waitForEvent('page', { timeout: 10000 }), page.keyboard.press('Enter')]);
   await modTab.waitForLoadState('domcontentloaded').catch(() => {});
-  check(modRows.length === 1 && modRows[0].t === 'Mastering Physics' && modRows[0].s === 'PHYS-008-01 · Week 2: Forces · Module tool' && modTab.url() === `${BASE}/courses/102/external_tools/retrieve?display=borderless&url=${encodeURIComponent('https://session.masteringphysics.com/lti/launch')}&bcv=tool`, `and a tool placed in a module: ${JSON.stringify(modRows)} → ${modTab.url()}`);
+  check(modRows.length === 1 && modRows[0].t === 'Mastering Physics' && modRows[0].s === 'PHYS-008-01 · Week 2: Forces · Module tool' && modTab.url() === `${BASE}/mock-tool?for=module+item+i8&course=102&bcv=tool`, `and a tool placed in a module: ${JSON.stringify(modRows)} → ${modTab.url()}`);
   await modTab.close().catch(() => {});
   const waRows = await findRows('/open webassign');
   const [waTab] = await Promise.all([context.waitForEvent('page', { timeout: 10000 }), page.keyboard.press('Enter')]);

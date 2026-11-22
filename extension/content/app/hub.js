@@ -45,15 +45,14 @@
   const handsIn = (a) => (a?.submission_types || []).some((t) => ['online_upload', 'online_text_entry', 'online_url'].includes(t));
   const toolLaunch = (a, cid) => { const attrs = a.external_tool_tag_attributes || {}; return attrs.url ? `/courses/${cid}/external_tools/retrieve?assignment_id=${a.id}&display=borderless&url=${encodeURIComponent(attrs.url)}` : `/courses/${cid}/assignments/${a.id}`; };
   function launchTool(a, cid, from = null) {
-    const url = toolLaunch(a, cid);
-    if (BCV.exttool) BCV.exttool.open({ title: a.name, url, newTab: url, from });
-    else window.open(url, '_blank', 'noopener');
+    // (2.99.152) by the assignment's own launch, which carries the link its instructor set up (exttool.openAssignment)
+    if (BCV.exttool) BCV.exttool.openAssignment({ courseId: cid, assignmentId: a.id, title: a.name, from });
+    else window.open(toolLaunch(a, cid), '_blank', 'noopener');
   }
   const moduleToolUrl = (it, cid) => `/courses/${cid}/external_tools/retrieve?display=borderless&url=${encodeURIComponent(it.external_url || '')}`;
   function launchModuleTool(it, cid, from = null) {
-    const url = moduleToolUrl(it, cid);
-    if (BCV.exttool) BCV.exttool.open({ title: it.title, url, page: it.html_url ? pathOf(it.html_url) : null, from });
-    else window.open(url, '_blank', 'noopener');
+    if (BCV.exttool && it.id) BCV.exttool.openModuleItem({ courseId: cid, itemId: it.id, title: it.title, from }); // (2.99.152: its own launch)
+    else window.open(moduleToolUrl(it, cid), '_blank', 'noopener');
   }
 
   /** Work due: the planner's assignments, quizzes and graded discussions with nothing handed in,

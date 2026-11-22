@@ -590,7 +590,8 @@
     const toolLaunch = toolAttrs.url ? `${c.url}/external_tools/retrieve?assignment_id=${a.id}&display=borderless&url=${encodeURIComponent(toolAttrs.url)}` : `${c.url}/assignments/${a.id}`;
     let startPoll = () => {};
     /** The tool, full screen over the page (a new tab only where there is no popup to be had); the grade is looked for once it is open. */
-    const launchTool = (from = null) => { if (BCV.exttool) { BCV.exttool.open({ title: a.name, url: toolLaunch, newTab: toolLaunch, from }); startPoll(); } else window.open(toolLaunch, '_blank', 'noopener'); };
+    // (2.99.152) by the assignment's own launch, which carries the link its instructor set up (exttool.openAssignment)
+    const launchTool = (from = null) => { if (BCV.exttool) { BCV.exttool.openAssignment({ courseId: c.id, assignmentId: a.id, title: a.name, from }); startPoll(); } else window.open(toolLaunch, '_blank', 'noopener'); };
     const available = a.unlock_at && a.lock_at ? `${U.fmtAt(a.unlock_at)} – ${U.fmtAt(a.lock_at)}` : a.unlock_at ? `from ${U.fmtAt(a.unlock_at)}` : a.lock_at ? `until ${U.fmtAt(a.lock_at)}` : null;
     // Our own submission flow handles uploads, text entries and URLs (plus the tools Canvas
     // lists for handing work in); media recordings and annotations stay on Canvas's page.
@@ -605,7 +606,7 @@
     const heldOf = (x) => gradedOf(x) && x.posted_at === null;
     const status = statusOf(s), posted = postedOf(s), held = heldOf(s);
     // the phone draws the item page its own way (the iPhone mockup)
-    if (BCV.phone?.active()) return BCV.phone.assignment(ctx, shell, { a, s, types, available, isTool, toolNewTab, toolLaunch, nativeSubmit, canvasOnly, attemptsLeft, status, posted, held, slot, fill });
+    if (BCV.phone?.active()) return BCV.phone.assignment(ctx, shell, { a, s, types, available, isTool, toolNewTab, toolLaunch, launchTool, nativeSubmit, canvasOnly, attemptsLeft, status, posted, held, slot, fill });
     // (2.99.13) The assignment page, to the mockup: the way back and the assignments either side on one row; the title and
     // one pill saying where the work stands; the facts in boxes (due, points, how it is handed in, the rubric); then the
     // one big pill — Submit assignment, which grows into the hand-in panel; once marked, the grade, which grows into the

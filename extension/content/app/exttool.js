@@ -203,6 +203,34 @@
     }
     return null;
   }
+  // ---- an assignment's (or a module item's) own launch (2.99.152) --------------------------------------------------
+  // Canvas launches an assignment's tool with the link its instructor set up on it — for an LTI 1.3 tool (zyBooks) the
+  // section or activity it points at. Its retrieve address — the tool's address alone — launched the tool bare, and
+  // zyBooks said "an instructor has not yet configured the link" (SR-MWL9MZ14-ACLN). Canvas's sessionless launch for the
+  // assignment (launch_type assessment) or the module item (module_item) carries that link, as Canvas's own page does (the
+  // apps launch this way: native-app.js toolLaunch). Where Canvas will not give one, Canvas's own page for the assignment
+  // or the item is what opens: it launches the tool with the same link itself.
+  async function ownLaunch(courseId, params, fallback) {
+    if (BCV.lms?.d2l || !BCV.canvas?.get || !/^\d+$/.test(String(courseId || ''))) return fallback;
+    try {
+      const r = await BCV.canvas.get(`/api/v1/courses/${courseId}/external_tools/sessionless_launch`, { params });
+      if (r?.url) return String(r.url);
+    } catch { /* Canvas's own page */ }
+    return fallback;
+  }
+  /** An assignment's tool, opened by its own launch. */
+  async function openAssignment({ courseId, assignmentId, title, from = null }) {
+    const page = `/courses/${courseId}/assignments/${assignmentId}`;
+    const url = await ownLaunch(courseId, { launch_type: 'assessment', assignment_id: String(assignmentId) }, page);
+    return open({ title, url, page, newTab: url, from });
+  }
+  /** A module's tool item, opened by its own launch. */
+  async function openModuleItem({ courseId, itemId, title, from = null }) {
+    const page = `/courses/${courseId}/modules/items/${itemId}`;
+    const url = await ownLaunch(courseId, { launch_type: 'module_item', module_item_id: String(itemId) }, page);
+    return open({ title, url, page, newTab: url, from });
+  }
+
   /** A link to a tool, as Canvas gives it: Canvas's own tool pages launch borderless, any other address as it is. */
   function openLink({ title, href, from = null, icon = null, note = '' } = {}) {
     let u;
@@ -216,7 +244,7 @@
   const isToolTab = () => { try { return new URLSearchParams(location.search).get('bcv') === 'tool'; } catch { return false; } };
 
   BCV.exttool = {
-    open, openLink, isToolHref, isToolTab, borderless, launched,
+    open, openLink, openAssignment, openModuleItem, isToolHref, isToolTab, borderless, launched,
     theme: { get: () => theme, set: setTheme, button: themeButton },
   };
 })();
