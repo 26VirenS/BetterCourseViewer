@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -17,13 +18,13 @@ namespace Simpl.Screens;
 
 /// <summary>
 /// External Tools, in the navigation pane under Tools (the Mac's ExternalToolsView): every tool the school provides in
-/// the student's courses — a course's own (its navigation's) and those found only in its assignments and modules — a card
-/// a tool, in columns that fill as a masonry does (each card at the foot of the shortest column so far): its letter, its
-/// name, its site and where it is found. A tool used in work — Knewton Alta's assignments, a publisher's module items —
-/// is a button whole: it says the next of them still to do, and a press opens the list of every place it is used, to
-/// choose the one to open (ExternalToolsList.cs). A tool that is only a course's tab has each course it is in a press
-/// away, as its chips. Knewton Alta opens in its own window, the rest in the tool window. The filter
-/// beside the title narrows the tools by name, site or course.
+/// the student's courses — a course's own (its navigation's) and those found only in its assignments and modules.
+/// (0.3.110) As the watch's honeycomb (ToolBubbles.cs): a bubble a tool, the one needed soonest in the middle and the rest
+/// in rings round it, each filled with its tool's colour from the logo on its site, the logo's mark in white on it and its
+/// name along its lower edge; a badge says how many are still to do (red with something missing, orange with something
+/// due today). A press opens the list of every place it is used — a course's own tab a row of its own — to choose the one
+/// to open (ExternalToolsList.cs); a tool that is one course's tab and nothing else opens it at once. Knewton Alta opens
+/// in its own window, the rest in the tool window. The filter beside the title narrows the tools by name, site or course.
 /// </summary>
 public sealed partial class ExternalToolsScreen : Screen
 {
@@ -89,9 +90,6 @@ public sealed partial class ExternalToolsScreen : Screen
         public bool Upcoming { get; set; }
     }
 
-    /// <summary>The narrowest a card is laid out, and the room between cards (across and down alike).</summary>
-    private const double MinCard = 360, Gap = 16;
-
     private static readonly Color Gray = Color.FromRgb(0x8e, 0x8e, 0x93);
 
     private readonly Loader<Data> model;
@@ -99,7 +97,7 @@ public sealed partial class ExternalToolsScreen : Screen
     private string query = "";
     private bool hadRows;
     private string? lastSub;
-    /// <summary>The cards as drawn, by tool: where the keyboard goes back to as a tool's list closes.</summary>
+    /// <summary>The bubbles as drawn, by tool: where the keyboard goes back to as a tool's list closes.</summary>
     private readonly Dictionary<string, FrameworkElement> cards = new();
 
     public ExternalToolsScreen(Engine.Engine engine) : base(engine) => model = Watch(new Loader<Data>());
@@ -139,11 +137,8 @@ public sealed partial class ExternalToolsScreen : Screen
         CloseList();
     }
 
-    /// <summary>Two columns once two cards of <see cref="MinCard"/> fit side by side, three once three do; else one.</summary>
-    private static int Columns(double width) => width >= 3 * MinCard + 2 * Gap ? 3 : width >= 2 * MinCard + Gap ? 2 : 1;
-
-    /// <summary>Built again only when the columns change: within a column count the cards simply take the width.</summary>
-    protected override bool LayoutChanges(double before, double now) => Columns(before) != Columns(now);
+    /// <summary>Built again only when the honeycomb's rows hold another number across, or are drawn at another size.</summary>
+    protected override bool LayoutChanges(double before, double now) => HoneyPlan.KeyOf(before) != HoneyPlan.KeyOf(now);
 
     protected override FrameworkElement Build()
     {
@@ -162,11 +157,89 @@ public sealed partial class ExternalToolsScreen : Screen
             CloseList();
             return K.Text($"No tool matches “{query.Trim()}”.", Ty.Body, B.Text2);
         }
-        var page = new Masonry(Columns(Width), Gap);
-        foreach (var t in shown) page.Children.Add(cards[t.Id] = Card(t));
+        // (0.3.110) the honeycomb, centred across the page
+        var specs = Specs(shown);
+        var plan = HoneyPlan.Make(specs.Count, Width > 0 ? Width : 900);
+        var field = new Canvas { Width = plan.Width, Height = plan.Height, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 4, 0, 8) };
+        for (var i = 0; i < specs.Count && i < plan.Cells.Count; i++)
+        {
+            var cell = plan.Cells[i];
+            var b = Bubble(specs[i], cell.Size);
+            Canvas.SetLeft(b, cell.X - cell.Size / 2);
+            Canvas.SetTop(b, cell.Y - cell.Size / 2);
+            field.Children.Add(b);
+            cards[specs[i].Tool.Id] = b;
+        }
         Rehang(shown);
         LaunchList(shown);
-        return page;
+        return field;
+    }
+
+    /// <summary>One tool as its bubble: its badge's number and colour, its tooltip and what a screen reader says.</summary>
+    private sealed record BubbleSpec(Tool Tool, int Count, BubbleTone Tone, string Help, string Label);
+
+    /// <summary>(0.3.110) Each tool as its bubble: the one needed soonest first (the middle), then those with something
+    /// missing, then those with places to choose from, then a course's own tabs — by name within each. Its badge: how many
+    /// are still to do (else how many are missing), red with something missing, orange with something due today.</summary>
+    private static List<BubbleSpec> Specs(List<Tool> rows)
+    {
+        var today = DateTime.Now.Date;
+        return rows.Select(t =>
+            {
+                var items = t.Courses.SelectMany(c => c.Items).ToList();
+                var due = items.Where(i => i.Upcoming).Select(i => DueAt(i.Due)).Where(d => d != null).Min();
+                var missing = items.Count(i => i.Status?.Kind == "bad");
+                var group = due != null ? 0 : missing > 0 ? 1 : items.Count > 0 ? 2 : 3;
+                return (t, items, due, missing, group);
+            })
+            .OrderBy(x => x.group).ThenBy(x => x.due ?? DateTime.MaxValue).ThenBy(x => x.t.Name, StringComparer.CurrentCultureIgnoreCase)
+            .Select(x =>
+            {
+                var toDo = x.items.Count(i => i.Upcoming);
+                var tone = x.missing > 0 ? BubbleTone.Late : x.due is { } d && d.Date == today ? BubbleTone.Today : BubbleTone.Plain;
+                var help = x.items.Count == 0 ? $"Open {x.t.Name}" : $"Choose which {Noun(x.t)} to open";
+                if (x.t.Next is { Title.Length: > 0 } n)
+                {
+                    var title = n.Short is { Length: > 0 } s ? s : Short(x.t, n.Title);
+                    var when = string.Join(" · ", new[] { (n.Sub ?? "").Split(" · ")[0], n.Course }.Where(w => !string.IsNullOrEmpty(w)));
+                    help = when.Length > 0 ? $"Next: {title} · {when}" : $"Next: {title}";
+                }
+                var said = new List<string> { x.t.Name };
+                if (toDo > 0) said.Add($"{toDo} to do");
+                if (x.missing > 0) said.Add($"{x.missing} missing");
+                return new BubbleSpec(x.t, toDo > 0 ? toDo : x.missing, tone, help, string.Join(", ", said));
+            })
+            .ToList();
+    }
+
+    /// <summary>A due date as Canvas gives it ("2026-11-23T07:59:00Z"), in local time; null for none.</summary>
+    private static DateTime? DueAt(string? s) =>
+        DateTimeOffset.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var d) ? d.LocalDateTime : null;
+
+    /// <summary>A tool's bubble, a button: a press opens its list (or, a tool that is one course's tab and nothing else,
+    /// that tab).</summary>
+    private FrameworkElement Bubble(BubbleSpec s, double size)
+    {
+        var t = s.Tool;
+        var orb = new ToolOrb(t.Name, t.Host, t.Courses.FirstOrDefault()?.Color ?? "", size);
+        BubbleButton b = null!;
+        b = new BubbleButton(orb, s.Count > 0 ? BubbleButton.Badge(s.Count, s.Tone) : null, size, () => Press(t, b));
+        b.ToolTip = s.Help;
+        AutomationProperties.SetName(b, s.Label);
+        AutomationProperties.SetHelpText(b, s.Help);
+        return b;
+    }
+
+    /// <summary>A bubble pressed: its list — or, with nothing to choose (one course's tab and no work), that tab at once.</summary>
+    private void Press(Tool t, FrameworkElement bubble)
+    {
+        var tabs = t.Courses.Where(c => c.Open.ContainsKey("tool")).ToList();
+        if (t.Courses.All(c => c.Items.Count == 0))
+        {
+            if (tabs.Count == 1) { CloseList(); Open(engine, t, tabs[0]); return; }
+            if (tabs.Count == 0) { if (t.Courses.FirstOrDefault() is { } c) { CloseList(); Open(engine, t, c); } return; }
+        }
+        ToggleList(t.Id, bubble);
     }
 
     private List<Tool> Filtered(List<Tool> rows)
@@ -182,140 +255,6 @@ public sealed partial class ExternalToolsScreen : Screen
 
     /// <summary>A tool used in work (its assignments, its module items): its card opens the list of them.</summary>
     private static bool Chooser(Tool t) => t.Instances > 0 && t.Courses.Any(c => c.Items.Count > 0);
-
-    // ---- a card ----
-
-    /// <summary>
-    /// A tool: its letter on its first course's colour, its name, its site (when it has one of its own) and where it is
-    /// found. A tool used in work is a button whole: under its head the next of its work still to do, the courses whose
-    /// tab it also is (each opens that tab, not the list), and at its foot how many places it is used, with the chevron
-    /// that turns over while their list is open. Any other tool is a card with each course it is in, a press away.
-    /// </summary>
-    private FrameworkElement Card(Tool t)
-    {
-        // (the tool's name the card's strongest words — a size up from the body, semibold — over its course chips, which
-        //  are regular: a wall of course names must not outweigh what the card is about)
-        var name = K.Wrapped(t.Name, Ty.BodyStrong, B.Text, 2);
-        name.FontSize = 16;
-        name.LineHeight = 22;
-        name.MaxHeight = 2 * 22 + 1;
-        var words = K.V(2, name);
-        if (!string.IsNullOrEmpty(t.Host)) words.Children.Add(K.Text(t.Host, Ty.Caption, B.Text2));
-        words.Children.Add(K.Wrapped(WhereFound(t), Ty.Caption, B.Text2, 2));
-        var head = K.Columns("auto, *", Monogram(t, 40).Margin(0, 0, 12, 0).Col(0), words.Col(1));
-        var body = K.V(12, head);
-        if (!Chooser(t))
-        {
-            body.Children.Add(Chips(t, t.Courses));
-            return K.Card(body, new Thickness(16));
-        }
-        if (t.Next is { Title.Length: > 0 } n) body.Children.Add(NextLine(t, n));
-        var tabs = t.Courses.Where(c => c.Open.ContainsKey("tool")).ToList();
-        if (t.Kinds.Contains("Course navigation") && tabs.Count > 0) body.Children.Add(Chips(t, tabs));
-        body.Children.Add(Foot(t));
-        PressCard card = null!;
-        card = new PressCard(body, () => ToggleList(t.Id, card));
-        var noun = Noun(t);
-        card.ToolTip = $"Choose which {noun} to open";
-        AutomationProperties.SetName(card, $"{t.Name}, {Places(t)}");
-        AutomationProperties.SetHelpText(card, $"Opens the list to choose which {noun} to open");
-        return card;
-    }
-
-    /// <summary>A tool's letter, white, on a rounded square of its first course's colour (its card's head, and its list's).</summary>
-    private static Border Monogram(Tool t, double size)
-    {
-        var tint = K.Hex(t.Courses.FirstOrDefault()?.Color, Gray);
-        var letter = new TextBlock
-        {
-            Text = t.Name.Length > 0 ? t.Name[..1].ToUpperInvariant() : "•", FontSize = Math.Round(size * 0.48), FontWeight = FontWeights.Bold, FontFamily = K.DisplayFace,
-            Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
-        };
-        return new Border
-        {
-            Width = size, Height = size, CornerRadius = new CornerRadius(size / 5), Child = letter, VerticalAlignment = VerticalAlignment.Top,
-            Background = new LinearGradientBrush(K.Mix(tint, Colors.White, 0.12), K.Mix(tint, Colors.Black, 0.12), 90),
-        };
-    }
-
-    /// <summary>The next of the tool's work still to do, on a quiet wash across the card: its course's dot, its title, and
-    /// — after the Next pill its list wears too — when it is due, in which course.</summary>
-    private static FrameworkElement NextLine(Tool t, Soonest n)
-    {
-        var dot = K.Dot(K.Hex(t.Courses.FirstOrDefault(c => c.Name == n.Course)?.Color, Gray), 8);
-        dot.VerticalAlignment = VerticalAlignment.Top;
-        dot.Margin = new Thickness(0, 6, 10, 0);
-        var title = K.Text(n.Short is { Length: > 0 } s ? s : Short(t, n.Title), Ty.Body);
-        // (when it is due, without its points: the line is about what comes next)
-        var when = string.Join(" · ", new[] { (n.Sub ?? "").Split(" · ")[0], n.Course }.Where(s => !string.IsNullOrEmpty(s)));
-        var line = K.Columns("auto, *", K.Chip("Next", Appearance.Accent, strong: true).Margin(0, 0, 6, 0).Col(0), K.Text(when, Ty.Caption, B.Text2).Col(1));
-        line.Margin = new Thickness(0, 2, 0, 0);
-        var well = new Border
-        {
-            Child = K.Columns("auto, *", dot.Col(0), K.V(1, title, line).Col(1)),
-            Padding = new Thickness(10, 8, 10, 8), CornerRadius = new CornerRadius(6),
-        };
-        return well.Bg(B.Subtle);
-    }
-
-    /// <summary>A card's foot, under a hairline: how many places the tool is used, and the chevron of its list.</summary>
-    private FrameworkElement Foot(Tool t)
-    {
-        // (0.3.100: to the right — the list opens in a popup of its own, no longer under the card)
-        var chevron = K.Icon(SymbolRegular.ChevronRight20, 12, B.Text2);
-        var row = K.Columns("*, auto", K.Text(Places(t), Ty.Caption, B.Text2).Col(0), chevron.Col(1));
-        return K.V(10, K.Divider(), row);
-    }
-
-    /// <summary>The courses' chips, as many to a line as fit: none wider than the card's inside, a long course's name
-    /// ending in an ellipsis.</summary>
-    private FrameworkElement Chips(Tool t, IEnumerable<Course> courses)
-    {
-        var wrap = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, -6) };
-        foreach (var c in courses) wrap.Children.Add(CoursePill(t, c));
-        // (each chip kept to the width the card has inside, as that width changes)
-        wrap.SizeChanged += (_, e) =>
-        {
-            foreach (FrameworkElement chip in wrap.Children) chip.MaxWidth = Math.Max(0, e.NewSize.Width - chip.Margin.Left - chip.Margin.Right);
-        };
-        return wrap;
-    }
-
-    /// <summary>A course the tool is in: its dot, its name (what room there is, in regular weight under the tool's name),
-    /// and the symbol of a Simpl window of its own — the one the tool opens in (a course's More and a module's tool wear it
-    /// too; ↗ would say it leaves for the browser). A press opens the tool there (on a card that opens a list, that press
-    /// is the chip's alone).</summary>
-    private FrameworkElement CoursePill(Tool t, Course c)
-    {
-        var name = K.Text(c.Name, Ty.Caption);
-        var row = K.Columns("auto, *, auto",
-            K.Dot(K.Hex(c.Color), 7).Margin(0, 0, 6, 0).Col(0),
-            name.Col(1),
-            CourseKit.OwnWindowMark().Margin(6, 0, 0, 0).Col(2));
-        // (K.Subtle marks its press handled: the card round it is not pressed, nor opened, by it)
-        var b = K.Subtle(row, () => { CloseList(); Open(engine, t, c); }, new Thickness(10, 5, 10, 6), 12);
-        b.SetResourceReference(Control.BackgroundProperty, B.Subtle3);
-        b.Stroke(B.ControlStroke);
-        b.HorizontalAlignment = HorizontalAlignment.Left;
-        b.Margin = new Thickness(0, 0, 6, 6);
-        b.ToolTip = $"Open {t.Name} in {c.Name}";
-        AutomationProperties.SetName(b, $"Open {t.Name} in {c.Name}");
-        return b;
-    }
-
-    /// <summary>Where it was found: in how many courses, a course's navigation; for a tool whose card is not a list, its
-    /// assignments (how many) and its modules — a list's card says how many places at its foot.</summary>
-    private static string WhereFound(Tool t)
-    {
-        var parts = new List<string> { Simpl.Tools.ToolKit.Plural(t.Courses.Count, "course") };
-        if (t.Kinds.Contains("Course navigation")) parts.Add("Course navigation");
-        if (!Chooser(t))
-        {
-            if (t.Assignments > 0) parts.Add(Simpl.Tools.ToolKit.Plural(t.Assignments, "assignment"));
-            if (t.Kinds.Contains("Modules")) parts.Add("Modules");
-        }
-        return string.Join(" · ", parts);
-    }
 
     /// <summary>How many places a tool is used: "5 assignments", "3 module items", or "5 places" when it is both.</summary>
     private static string Places(Tool t)
@@ -423,99 +362,5 @@ public sealed partial class ExternalToolsScreen : Screen
             if (listId != id && ToolOf(id) is { } t && cards.TryGetValue(id, out var card) && card.IsLoaded) OpenList(t, card);
         };
         wait.Start();
-    }
-
-    // ---- the page's columns ----
-
-    /// <summary>
-    /// A card that is a button whole (the kit's CardButton style: Windows 11's card, lighter under the pointer, a shade down
-    /// while pressed) and gives a little under the press — to 0.98 while it is held, by the pointer or the Space bar, and
-    /// back as it is let go (Motion.Fast in, Motion.Normal out, decelerating; still, with Windows' animation effects off).
-    /// It is the card's face that gives, not the button.
-    /// A button inside it (a course's chip) takes its own press: the card is neither pressed nor opened by it.
-    /// </summary>
-    private sealed class PressCard : Button
-    {
-        private readonly ScaleTransform scale = new(1, 1);
-
-        public PressCard(UIElement content, Action click)
-        {
-            Content = content;
-            SetResourceReference(StyleProperty, "CardButton");
-            Padding = new Thickness(16);
-            VerticalContentAlignment = VerticalAlignment.Top;
-            Click += (_, e) => { e.Handled = true; click(); };
-        }
-
-        public override void OnApplyTemplate()
-        {
-            base.OnApplyTemplate();
-            var face = GetTemplateChild("Surface") as FrameworkElement ?? this;
-            face.RenderTransformOrigin = new Point(0.5, 0.5);
-            face.RenderTransform = scale;
-        }
-
-        protected override void OnIsPressedChanged(DependencyPropertyChangedEventArgs e)
-        {
-            base.OnIsPressedChanged(e);
-            if (!Motion.On) return;
-            var ms = IsPressed ? Motion.Fast : Motion.Normal;
-            Motion.To(scale, ScaleTransform.ScaleXProperty, IsPressed ? 0.98 : 1, ms, Motion.Decelerate);
-            Motion.To(scale, ScaleTransform.ScaleYProperty, IsPressed ? 0.98 : 1, ms, Motion.Decelerate);
-        }
-    }
-
-    /// <summary>
-    /// Cards in columns of one width, each put in turn at the foot of the column that is shortest so far (the leftmost of
-    /// two alike) — a masonry: a short card leaves no gap under it for its row's tallest. The room between cards is the
-    /// same across and down. How many columns is the screen's, for the page's width.
-    /// </summary>
-    private sealed class Masonry : Panel
-    {
-        private readonly int columns;
-        private readonly double gap;
-
-        public Masonry(int columns, double gap)
-        {
-            this.columns = Math.Max(1, columns);
-            this.gap = gap;
-        }
-
-        private double ColumnWidth(double width) => Math.Max(0, (width - gap * (columns - 1)) / columns);
-
-        /// <summary>Where each card goes, in order (its column and its top), and how tall the tallest column is.</summary>
-        private (List<(int Column, double Top)> Spots, double Height) Place()
-        {
-            var tops = new double[columns];
-            var spots = new List<(int, double)>(InternalChildren.Count);
-            foreach (UIElement c in InternalChildren)
-            {
-                var col = 0;
-                for (var i = 1; i < columns; i++) if (tops[i] < tops[col] - 0.5) col = i;
-                spots.Add((col, tops[col]));
-                tops[col] += c.DesiredSize.Height + gap;
-            }
-            return (spots, InternalChildren.Count == 0 ? 0 : Math.Max(0, tops.Max() - gap));
-        }
-
-        protected override Size MeasureOverride(Size available)
-        {
-            var width = double.IsInfinity(available.Width) ? columns * MinCard + gap * (columns - 1) : available.Width;
-            var w = ColumnWidth(width);
-            foreach (UIElement c in InternalChildren) c.Measure(new Size(w, double.PositiveInfinity));
-            return new Size(width, Place().Height);
-        }
-
-        protected override Size ArrangeOverride(Size final)
-        {
-            var w = ColumnWidth(final.Width);
-            var (spots, _) = Place();
-            for (var i = 0; i < InternalChildren.Count; i++)
-            {
-                var c = InternalChildren[i];
-                c.Arrange(new Rect(spots[i].Column * (w + gap), spots[i].Top, w, c.DesiredSize.Height));
-            }
-            return final;
-        }
     }
 }

@@ -26,10 +26,12 @@ namespace Simpl.Screens;
 /// eight; each place with a mark of where it stands (to do, done, missing, late, a module item), its title, its line and
 /// its status, a chevron under the pointer; at its foot, the keys it takes. ↑ and ↓ move between them, Enter opens one,
 /// Escape, its × or a press anywhere outside it closes it, and opening one closes it first.
+/// (0.3.110) A square, 560 a side, the list scrolling inside it; its head has the tool's bubble and its colour; a course
+/// the tool is a tab in has that tab as a row of its own, first among the course's places (the card's chips before).
 /// </summary>
 public sealed partial class ExternalToolsScreen
 {
-    private const double ListWidth = 600, ListHeight = 720;
+    private const double ListWidth = 560, ListHeight = 560;
 
     private Sheet? list;
     private string? listId;
@@ -43,7 +45,10 @@ public sealed partial class ExternalToolsScreen
     /// <summary>(0.3.101) The next still to do's row in <see cref="listRows"/>, if it is shown.</summary>
     private int listNext = -1;
 
-    /// <summary>A card pressed: its list.</summary>
+    /// <summary>The courses a tool's list has: those it has work in, and those it is a tab in.</summary>
+    private static List<Course> ListedCourses(Tool t) => t.Courses.Where(c => c.Items.Count > 0 || c.Open.ContainsKey("tool")).ToList();
+
+    /// <summary>A bubble pressed: its list.</summary>
     private void ToggleList(string id, FrameworkElement card)
     {
         if (listId == id) return;
@@ -66,17 +71,16 @@ public sealed partial class ExternalToolsScreen
     private void OpenList(Tool t, FrameworkElement card)
     {
         CloseList();
-        var places = t.Courses.Where(c => c.Items.Count > 0).ToList();
+        var places = ListedCourses(t);
         if (places.Count == 0) return;
         var count = places.Sum(c => c.Items.Count);
 
-        // (0.3.98) its head, on a wash of its colour: the tool's letter, its name, its site, how many places in how many
-        // courses — and how many still to do
-        var tint = K.Hex(t.Courses.FirstOrDefault()?.Color, Gray);
-        var tile = Monogram(t, 38);
-        tile.VerticalAlignment = VerticalAlignment.Center;
+        // (0.3.98) its head, on a wash of its colour: (0.3.110) the tool's bubble, its name, its site, how many places in
+        // how many courses — and how many still to do
+        var tint = ToolLogos.Look(t.Host) is { Kind: not "none" } look ? K.Hex(look.Brand, Gray) : K.Hex(t.Courses.FirstOrDefault()?.Color, Gray);
+        var tile = new ToolOrb(t.Name, t.Host, t.Courses.FirstOrDefault()?.Color ?? "", 40, named: false) { VerticalAlignment = VerticalAlignment.Center };
         var where = places.Count == 1 ? "1 course" : Simpl.Tools.ToolKit.Plural(places.Count, "course");
-        var about = $"{Places(t)} in {where}";
+        var about = count > 0 ? $"{Places(t)} in {where}" : $"Its tab in {where}";
         if (t.Host.Length > 0 && !string.Equals(t.Host, t.Name, StringComparison.OrdinalIgnoreCase)) about = $"{t.Host} · {about}";
         var words = K.V(1, K.Text(t.Name, Ty.BodyStrong), K.Text(about, Ty.Caption, B.Text2));
         words.VerticalAlignment = VerticalAlignment.Center;
@@ -120,7 +124,7 @@ public sealed partial class ExternalToolsScreen
         };
         var content = K.Rows("auto, auto, *, auto", head.Row(0), listFilter?.Row(1), scroller.Row(2), Foot().Row(3));
 
-        var surface = new Grid { MaxHeight = ListHeight, Children = { content } };
+        var surface = new Grid { Height = ListHeight, MaxHeight = ListHeight, Children = { content } };
         surface.SetResourceReference(TextElement.ForegroundProperty, B.Text);
         AutomationProperties.SetName(surface, $"{t.Name}: {Places(t)}");
         surface.PreviewKeyDown += OnListKey;
@@ -130,6 +134,7 @@ public sealed partial class ExternalToolsScreen
         list = sheet;
         listId = t.Id;
         listCard = card;
+        if (card is BubbleButton lit) lit.Lit = true;
         listSurface = surface;
         rowsHost = rows;
         FillList(t);
@@ -158,7 +163,7 @@ public sealed partial class ExternalToolsScreen
         listRows.Clear();
         listNext = -1;
         var q = (listFilter?.Text ?? "").Trim();
-        var places = t.Courses.Where(c => c.Items.Count > 0).ToList();
+        var places = ListedCourses(t);
         var grouped = places.Count > 1;
         // (the soonest still to do — as the card says it — else the first still to do as listed)
         var next = t.Next is { } n ? places.FirstOrDefault(c => c.Name == n.Course)?.Items.FirstOrDefault(i => i.Upcoming && i.Title == n.Title) : null;
@@ -168,8 +173,11 @@ public sealed partial class ExternalToolsScreen
         foreach (var c in places)
         {
             var items = c.Items.Where(i => q.Length == 0 || Has(i.Title) || Has(i.Sub) || Has(i.Status?.Word) || Has(c.Name)).ToList();
-            if (items.Count == 0) continue;
-            if (grouped) rows.Children.Add(GroupHead(c, items.Count, first: !any));
+            // (0.3.110) the course's own tab, a row of its own, first
+            var tab = c.Open.ContainsKey("tool") && (q.Length == 0 || Has(t.Name) || Has(c.Name) || Has("tab"));
+            if (items.Count == 0 && !tab) continue;
+            if (grouped) rows.Children.Add(GroupHead(c, items.Count + (tab ? 1 : 0), first: !any));
+            if (tab) rows.Children.Add(TabRow(t, c));
             foreach (var it in items)
             {
                 if (ReferenceEquals(it, next)) listNext = listRows.Count;
@@ -207,6 +215,33 @@ public sealed partial class ExternalToolsScreen
         var tile = K.IconTile(symbol, tone != null ? K.Tone(tone) : K.Hex(c.Color, Gray), size);
         tile.CornerRadius = new CornerRadius(size * 0.3);
         return tile;
+    }
+
+    /// <summary>(0.3.110) A course's own tab, as a row: the window's mark on its course's colour, "Knewton Alta in CHEM
+    /// 110", and that it opens in a Simpl window.</summary>
+    private Button TabRow(Tool t, Course c)
+    {
+        var tile = K.IconTile(SymbolRegular.Window24, K.Hex(c.Color, Gray), 28);
+        tile.CornerRadius = new CornerRadius(28 * 0.3);
+        var words = K.V(2, K.Wrapped($"{t.Name} in {c.Name}", Ty.Body, B.Text, 2), K.Text("The course’s own tab, in a Simpl window", Ty.Caption, B.Text2));
+        words.VerticalAlignment = VerticalAlignment.Center;
+        var chevron = K.Icon(SymbolRegular.ChevronRight16, 12, B.Text3);
+        chevron.Margin = new Thickness(8, 0, 0, 0);
+        chevron.Opacity = 0;
+        var g = K.Columns("auto, *, auto", tile.Margin(0, 0, 11, 0).Col(0), words.Col(1), chevron.Col(2));
+        void Go()
+        {
+            CloseList();
+            Open(engine, t, c);
+        }
+        var b = K.Subtle(g, Go, new Thickness(10, 7, 10, 7), 6);
+        void Lit() => chevron.Opacity = b.IsMouseOver || b.IsKeyboardFocusWithin ? 1 : 0;
+        b.MouseEnter += (_, _) => Lit();
+        b.MouseLeave += (_, _) => Lit();
+        b.IsKeyboardFocusWithinChanged += (_, _) => Lit();
+        AutomationProperties.SetName(b, $"Open {t.Name} in {c.Name}");
+        listRows.Add((b, Go));
+        return b;
     }
 
     private Button ListRow(Tool t, Course c, Item it, bool next)
@@ -329,6 +364,7 @@ public sealed partial class ExternalToolsScreen
         if (list == null) return;
         list = null;
         listCard?.ClearValue(ToolTipService.IsEnabledProperty);
+        if (listCard is BubbleButton lit) lit.Lit = false;
         listId = null;
         listCard = null;
         listSurface = null;
@@ -344,7 +380,11 @@ public sealed partial class ExternalToolsScreen
     private void Rehang(List<Tool> shown)
     {
         if (listId is not { } id) return;
-        if (shown.FirstOrDefault(t => t.Id == id) is not { } tool || !Chooser(tool)) { CloseList(); return; }
-        if (cards.TryGetValue(id, out var card)) listCard = card;
+        if (shown.FirstOrDefault(t => t.Id == id) is not { } tool || ListedCourses(tool).Count == 0) { CloseList(); return; }
+        if (cards.TryGetValue(id, out var card))
+        {
+            listCard = card;
+            if (card is BubbleButton lit) lit.Lit = true;
+        }
     }
 }
