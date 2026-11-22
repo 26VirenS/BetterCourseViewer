@@ -89,7 +89,8 @@ final class ToolLogos: ObservableObject {
 
 /// A tool's logo found on its own site, as a browser finds a site's icon: the icons its home page names (`<link rel=icon>`,
 /// `apple-touch-icon`), those its web manifest names, then `/apple-touch-icon.png` and `/favicon.ico` — the sharpest of
-/// them, tried on the tool's host, then on its site's own domain. Under 48 pixels is too blurred to use.
+/// them, tried on the tool's host, then on its site's own domain, then on the site it sends its visitors on to. Under 48
+/// pixels is too blurred to use.
 enum LogoFinder {
     private static let session: URLSession = {
         let c = URLSessionConfiguration.ephemeral
@@ -108,16 +109,23 @@ enum LogoFinder {
     }
 
     static func find(host: String) async -> CGImage? {
-        let site = domain(host)
-        var sites = [host]
-        if site != host { sites += [site, "www." + site] }
+        var sites: [String] = []
+        func add(_ h: String) {
+            let site = domain(h)
+            for s in [h, site, "www." + site] where !sites.contains(s) && sites.count < 6 { sites.append(s) }
+        }
+        add(host)
         var seen = Set<URL>()
         var best: CGImage?
         var bestWidth = 0
-        var tried = Set<String>()
-        for s in sites where !tried.contains(s) {
-            tried.insert(s)
+        var next = 0
+        while next < sites.count {
+            let s = sites[next]
+            next += 1
             guard let start = URL(string: "https://\(s)/"), let page = await get(start) else { continue }
+            // (a site that sends its visitors on to another — session.masteringphysics.com to pearson.com — has that
+            //  one's icons tried too)
+            if let landed = page.url.host?.lowercased(), landed != s { add(landed) }
             let html = String(decoding: page.data.prefix(800_000), as: UTF8.self)
             let found = await candidates(html: html, base: page.url)
             for c in found.prefix(6) where !seen.contains(c.url) {
