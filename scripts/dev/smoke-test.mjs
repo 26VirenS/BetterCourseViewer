@@ -5425,6 +5425,26 @@ try {
   const typedSum = await page.$eval(`.bcv-qz__sum:nth-child(${typedN}) .bcv-qz__suma`, (e) => e.textContent.replace(/\s+/g, ' ').trim());
   check(typedSum === 'word1: primary visual cortex, word2: V2', `the review lists the blanks in the sentence's order: ${typedSum}`);
   await noteApi('POST', '/__mock/config', { typedBlanks: false });
+  // (2.99.153) Canvas's stand-ins for an answer with no plain words — "No answer text provided." on an option that is an
+  // equation, "answer_text" on a number answer — are taken off where the questions are read: the option shows its
+  // equation, the number answer its value and margin, and an option's real words stay as they are
+  const standIn = await sw.evaluate(async (base) => { const [t] = await chrome.tabs.query({ url: `${base}/*` }); const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: t.id }, world: 'ISOLATED', func: async () => {
+    const C = self.BCV.canvas;
+    const real = C.get;
+    C.get = async (path, opts) => (/\/quiz_submissions\/stand-in\/questions$/.test(path) ? {
+      quiz_submission_questions: [{ id: 4, position: 1 }, { id: 5, position: 2 }],
+      quiz_questions: [
+        { id: 4, question_type: 'multiple_choice_question', answers: [{ id: 41, text: 'No answer text provided.', html: '<p><img class="equation_image" alt="\\alpha < 0"></p>', weight: 0 }, { id: 42, text: 'No answer text provided.', html: '<p><img class="equation_image" alt="\\alpha = 0"></p>', weight: 100 }, { id: 43, text: 'α > 0', html: '', weight: 0 }] },
+        { id: 5, question_type: 'numerical_question', answers: [{ id: 51, text: 'answer_text', numerical_answer_type: 'exact_answer', exact: 3.4, margin: 0.1, weight: 100 }] },
+      ],
+    } : real.call(C, path, opts));
+    try {
+      const qs = await self.BCV.store.quizApi.questions({ id: 'stand-in' });
+      return qs.map((q) => q.answers.map((a) => `${a.text}|${a.html ? 'html' : ''}|${a.exact ?? ''}`));
+    } finally { C.get = real; }
+  } }); return result; }, BASE);
+  check(JSON.stringify(standIn) === JSON.stringify([['|html|', '|html|', 'α > 0||'], ['||3.4']]),
+    `Canvas's stand-ins ("No answer text provided.", "answer_text") are taken off an answer's words, its equation and its number kept: ${JSON.stringify(standIn)}`);
   } // quiz: typed blanks
   if (on('native pages')) {
 

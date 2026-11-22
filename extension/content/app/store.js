@@ -1593,6 +1593,14 @@
     return { used, allowed, left: allowed === null ? null : Math.max(0, allowed - used), open: list.some((s) => s.workflow_state === 'untaken') };
   }
 
+  // (2.99.153) Canvas puts a stand-in where an answer has no plain words — an answer that is only rich content (an
+  // equation, a picture) reads "No answer text provided.", and a number answer "answer_text". Neither is the answer, and
+  // the screens show words before rich content: so they are taken off here, where every quiz's questions are read, and
+  // what shows is the answer itself (its equation, or its number and margin).
+  const STAND_IN = /^\s*(no answer text provided\.?|answer_text)\s*$/i;
+  const cleanQuestion = (q) => (q && Array.isArray(q.answers)
+    ? { ...q, answers: q.answers.map((a) => (a && typeof a.text === 'string' && STAND_IN.test(a.text) ? { ...a, text: '' } : a)) }
+    : q);
   const quizApi = {
     /** Start an attempt, or return the open one. */
     async start(courseId, quizId, accessCode) {
@@ -1621,12 +1629,12 @@
       try {
         const r = await C.get(`/api/v1/quiz_submissions/${sub.id}/questions`, { params: { include: ['quiz_question'] } });
         const full = new Map((r?.quiz_questions || []).map((q) => [String(q.id), q]));
-        return (r?.quiz_submission_questions || []).map((q) => ({ ...(full.get(String(q.id)) || {}), ...q, id: String(q.id) }))
+        return (r?.quiz_submission_questions || []).map((q) => cleanQuestion({ ...(full.get(String(q.id)) || {}), ...q, id: String(q.id) }))
           .sort((a, b) => (a.position || 0) - (b.position || 0));
       } catch (e) {
         if (!courseId || !/one question at a time/i.test(e.message || '')) throw e;
         const qs = await C.get(`/api/v1/courses/${courseId}/quizzes/${quizId || sub.quiz_id}/questions`, { params: { quiz_submission_id: sub.id, quiz_submission_attempt: sub.attempt, per_page: 50 }, all: true, maxPages: 4 });
-        return (Array.isArray(qs) ? qs : []).map((q) => ({ ...q, id: String(q.id), answer: null, flagged: false }))
+        return (Array.isArray(qs) ? qs : []).map((q) => cleanQuestion({ ...q, id: String(q.id), answer: null, flagged: false }))
           .sort((a, b) => (a.position || 0) - (b.position || 0));
       }
     },
@@ -1634,7 +1642,7 @@
      *  readable once that attempt's results are visible (Import answers matches them to today's by content). */
     async attemptQuestions(courseId, quizId, sub, attempt) {
       const qs = await C.get(`/api/v1/courses/${courseId}/quizzes/${quizId || sub.quiz_id}/questions`, { params: { quiz_submission_id: sub.id, quiz_submission_attempt: attempt, per_page: 50 }, all: true, maxPages: 4 });
-      return Array.isArray(qs) ? qs : [];
+      return Array.isArray(qs) ? qs.map(cleanQuestion) : [];
     },
     // (a quiz with an access code wants it on every call about the attempt, not only at the start)
     answer(sub, questionId, answer, accessCode) {

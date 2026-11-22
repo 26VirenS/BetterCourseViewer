@@ -30,6 +30,9 @@
     expand: 'M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5',
   };
   self.BCV_WHATS_NEW = [
+    { version: '2.99.153', date: '2026-11-22', notes: [
+      { kind: 'fixed', title: 'Math in Quiz Answers', body: 'Answers that are equations or numbers show as they should.', icon: P.check },
+    ] },
     { version: '2.99.152', date: '2026-11-22', notes: [
       { kind: 'new', title: 'Retakes in Targets', body: 'Count standards you can retake toward your target grade.', icon: P.steps },
       { kind: 'new', title: 'Full-Screen Files', body: 'View any file full screen, then Esc to come back.', icon: P.expand },
