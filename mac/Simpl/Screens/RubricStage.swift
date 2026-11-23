@@ -900,7 +900,8 @@ struct RubricStageView: View {
         TimelineView(.animation(minimumInterval: nil, paused: !motion.running)) { tl in
             let now = motion.running ? tl.date.timeIntervalSinceReferenceDate : RingMotion.settled
             ZStack(alignment: .topLeading) {
-                RingStageFrame(geo: geo, pose: motion.pose(at: now), motion: motion, scale: scale, spun: motion.spun)
+                RingStageFrame(geo: geo, pose: motion.pose(at: now), motion: motion, scale: scale, spun: motion.spun,
+                               openLevel: motion.openLevel)
                     .id(phase)
                     .transition(.opacity.animation(.easeInOut(duration: 0.3)))
             }
@@ -922,9 +923,12 @@ private struct RingStageFrame: View {
     let motion: RingMotion
     let scale: CGFloat
     let spun: Double
+    /// (1.3.223) The level whose row shows all it asks for — a value of its own, so the frame is drawn again when it
+    /// changes (the clock, the same object, would not say so).
+    var openLevel: Int? = nil
 
     var body: some View {
-        BarMeasure(geo: geo, k: pose.sel, width: BarSide.rowWidth(scale), scale: scale, open: motion.openLevel)
+        BarMeasure(geo: geo, k: pose.sel, width: BarSide.rowWidth(scale), scale: scale, open: openLevel)
             .frame(width: CGFloat(RingUnits.width) * scale, height: CGFloat(RingUnits.height) * scale, alignment: .topLeading)
             .overlayPreferenceValue(BarRowHeights.self) { measured in
                 content(measured)
@@ -952,7 +956,8 @@ private struct RingStageFrame: View {
                 .accessibilityHidden(true)
             RingLabels(geo: geo, pose: pose, go: go, tones: tones, motion: motion, scale: scale)
             RingCentre(model: geo.model, pose: pose, tones: tones, scale: scale)
-            BarSide(geo: geo, pose: pose, places: places, motion: motion, scale: scale, spun: spun, fullHead: top != nil, cut: cut)
+            BarSide(geo: geo, pose: pose, places: places, motion: motion, scale: scale, spun: spun, fullHead: top != nil, cut: cut,
+                    openLevel: openLevel)
         }
         .frame(width: CGFloat(RingUnits.width) * scale, height: CGFloat(RingUnits.height) * scale, alignment: .topLeading)
     }
@@ -1216,8 +1221,9 @@ private struct BarSide: View {
     let spun: Double
     /// (planning-20) The rows stand under the whole description: show all of it.
     var fullHead = false
-    /// (1.3.223) The open criterion's rows whose words are cut short (a press shows them all).
+    /// (1.3.223) The open criterion's rows whose words are cut short (a press shows them all), and the one showing all.
     var cut: Set<Int> = []
+    var openLevel: Int? = nil
 
     private func px(_ v: Double) -> CGFloat { CGFloat(v) * scale }
     private var rowWidth: CGFloat { BarSide.rowWidth(scale) }
@@ -1261,7 +1267,7 @@ private struct BarSide: View {
                 let i = key % 1000
                 let picked = geo.picked(k, i)
                 let a = rowAlpha(i)
-                let isOpen = motion.openLevel == key
+                let isOpen = openLevel == key
                 let canOpen = isOpen || cut.contains(i)
                 BarLevelRow(level: levels[i], picked: picked, dim: marked && !picked, tone: tone, lines: isOpen ? nil : lines,
                             more: isOpen ? false : (canOpen ? true : nil), mark: geo.model.criteria[k].markText)
