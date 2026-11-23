@@ -193,7 +193,10 @@ final class RingMotion: ObservableObject {
         if instant {
             set(.bloom, 1)
             set(.marks, graded ? 1 : 0)
-            if let k { select(k) }
+            if let k {
+                select(k)
+                openAskedLevel(k)
+            }
             return
         }
         tween(.bloom, to: 1, duration: 1.1, linear: true)
