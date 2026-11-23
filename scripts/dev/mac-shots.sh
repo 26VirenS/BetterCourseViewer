@@ -1331,6 +1331,7 @@ push_set() {
   SIZE=1440x900 shoot light-10f-assignment-wide-quiz 12 -SimplPlace course:101 -SimplPush /courses/101/assignments/1001
   SIZE=1440x900 shoot light-10m-assignment-more 14 -SimplPlace course:104 -SimplPush /courses/104/assignments/4002 # (1.3.215: More Details under the facts)
   shoot light-32b-rubric-open 16 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:1
+  shoot light-32c-rubric-level-whole 18 -SimplPlace course:104 -SimplPush /courses/104/assignments/4001 -SimplOpen rubric:1 -SimplRubricLevel 0 # (1.3.223: a level's words cut short, opened whole)
   shoot light-19d-quiz-click 18 -SimplOpen quiz:101:9011:take:1 -SimplQuizClick 4
   shoot light-19f-quiz-feedback 24 -SimplOpen quiz:101:9001:feedback
   shoot light-19e-quiz-click-next 18 -SimplOpen quiz:101:9011:take:1 -SimplQuizClick next

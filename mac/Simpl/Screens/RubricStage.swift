@@ -125,6 +125,8 @@ final class RingMotion: ObservableObject {
     @Published private(set) var spun: Double = 0
     @Published private(set) var foot0: Double = RingUnits.barFoot
     @Published private(set) var foot: Double = RingUnits.barFoot
+    /// (1.3.223) The level whose row shows all it asks for (criterion × 1000 + level), if one does: its row pressed.
+    @Published private(set) var openLevel: Int?
 
     private var resting: [Key: Double] = [.open: 0, .marks: 0, .swap: 1, .bloom: 0]
     private var tweens: [Key: Tween] = [:]
@@ -201,6 +203,21 @@ final class RingMotion: ObservableObject {
                 try? await Task.sleep(nanoseconds: 850_000_000)
                 self?.select(k)
             }
+            openAskedLevel(k)
+        }
+    }
+
+    /// (1.3.223) The screenshot suite's `-SimplRubricLevel 0`: that level's row opened to all it asks for once the bar is
+    /// out (the picture waits for it).
+    private func openAskedLevel(_ k: Int) {
+        guard let raw = UserDefaults.standard.string(forKey: "SimplRubricLevel"), let level = Int(raw) else { return }
+        Shot.began()
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 2_600_000_000)
+            self?.toggleLevel(k * 1000 + level)
+            NSLog("[Simpl] rubric: level %d of criterion %d opened", level, k)
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            Shot.ended()
         }
     }
 
@@ -209,6 +226,7 @@ final class RingMotion: ObservableObject {
     func select(_ raw: Int) {
         guard count > 0 else { return }
         let k = ((raw % count) + count) % count
+        if k != sel { openLevel = nil }
         let t = openNow
         if k == sel && t > 0.98 { return }
         if t > 0.98 && k != sel {
@@ -229,6 +247,12 @@ final class RingMotion: ObservableObject {
         fill(k, swap: false)
         tween(.open, to: 1, duration: 1.15)
         aimSwell()
+    }
+
+    /// (1.3.223) A level's row pressed: all it asks for shown (the rows round it making room), or back to its line or
+    /// two; another's opening closes the last.
+    func toggleLevel(_ key: Int) {
+        withAnimation(Motion.snappy) { openLevel = openLevel == key ? nil : key }
     }
 
     /// The bar rolls back up into the ring.
@@ -897,7 +921,7 @@ private struct RingStageFrame: View {
     let spun: Double
 
     var body: some View {
-        BarMeasure(geo: geo, k: pose.sel, width: BarSide.rowWidth(scale), scale: scale)
+        BarMeasure(geo: geo, k: pose.sel, width: BarSide.rowWidth(scale), scale: scale, open: motion.openLevel)
             .frame(width: CGFloat(RingUnits.width) * scale, height: CGFloat(RingUnits.height) * scale, alignment: .topLeading)
             .overlayPreferenceValue(BarRowHeights.self) { measured in
                 content(measured)
@@ -910,6 +934,12 @@ private struct RingStageFrame: View {
         let heights = unitHeights(measured)
         // (planning-20) the criterion's whole description where the rows still fit under it
         let head = measured[pose.sel * 1000 + BarMeasure.headKey].flatMap { scale > 0 ? Double($0 / scale) : nil }
+        // (1.3.223) the rows whose words are cut short: those taller whole than as shown
+        let cut = Set(geo.levels(pose.sel).indices.filter { i in
+            let key = pose.sel * 1000 + i
+            guard let whole = measured[key + BarMeasure.wholeKey], let shown = measured[key] else { return false }
+            return whole > shown + 0.5
+        })
         let top = geo.fullHeadTop(pose.sel, foot: pose.foot, heights: heights, head: head)
         let places = geo.places(pose.sel, foot: pose.foot, heights: heights, top: top)
         let painter = RingPainter(geo: geo, pose: pose, tones: tones, fracs: geo.fracs(pose.g), go: go, places: places)
@@ -919,7 +949,7 @@ private struct RingStageFrame: View {
                 .accessibilityHidden(true)
             RingLabels(geo: geo, pose: pose, go: go, tones: tones, motion: motion, scale: scale)
             RingCentre(model: geo.model, pose: pose, tones: tones, scale: scale)
-            BarSide(geo: geo, pose: pose, places: places, motion: motion, scale: scale, spun: spun, fullHead: top != nil)
+            BarSide(geo: geo, pose: pose, places: places, motion: motion, scale: scale, spun: spun, fullHead: top != nil, cut: cut)
         }
         .frame(width: CGFloat(RingUnits.width) * scale, height: CGFloat(RingUnits.height) * scale, alignment: .topLeading)
     }
@@ -940,9 +970,13 @@ private struct BarMeasure: View {
     let k: Int
     let width: CGFloat
     let scale: CGFloat
+    /// (1.3.223) The row showing all it asks for (criterion × 1000 + level), measured whole.
+    var open: Int? = nil
 
     /// The head's height's key, after the criterion's rows' (criterion × 1000 + level).
     static let headKey = 999
+    /// (1.3.223) A row's height with all its words, after its own key: to tell the rows that are cut short.
+    static let wholeKey = 500
 
     var body: some View {
         let levels = geo.levels(k)
@@ -958,12 +992,21 @@ private struct BarMeasure: View {
                     })
             }
             ForEach(levels.indices, id: \.self) { i in
-                BarLevelRow(level: levels[i], picked: geo.picked(k, i), dim: false, tone: tone, lines: lines,
+                BarLevelRow(level: levels[i], picked: geo.picked(k, i), dim: false, tone: tone,
+                            lines: open == k * 1000 + i ? nil : lines, more: open == k * 1000 + i ? false : nil,
                             mark: k >= 0 && k < geo.n ? geo.model.criteria[k].markText : "Your mark")
                     .frame(width: width, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
                     .background(GeometryReader { g in
                         Color.clear.preference(key: BarRowHeights.self, value: [k * 1000 + i: g.size.height])
+                    })
+                // (1.3.223) and whole, to know whether it is cut short
+                BarLevelRow(level: levels[i], picked: geo.picked(k, i), dim: false, tone: tone, lines: nil,
+                            mark: k >= 0 && k < geo.n ? geo.model.criteria[k].markText : "Your mark")
+                    .frame(width: width, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .background(GeometryReader { g in
+                        Color.clear.preference(key: BarRowHeights.self, value: [k * 1000 + i + BarMeasure.wholeKey: g.size.height])
                     })
             }
         }
@@ -1170,6 +1213,8 @@ private struct BarSide: View {
     let spun: Double
     /// (planning-20) The rows stand under the whole description: show all of it.
     var fullHead = false
+    /// (1.3.223) The open criterion's rows whose words are cut short (a press shows them all).
+    var cut: Set<Int> = []
 
     private func px(_ v: Double) -> CGFloat { CGFloat(v) * scale }
     private var rowWidth: CGFloat { BarSide.rowWidth(scale) }
@@ -1213,10 +1258,17 @@ private struct BarSide: View {
                 let i = key % 1000
                 let picked = geo.picked(k, i)
                 let a = rowAlpha(i)
-                BarLevelRow(level: levels[i], picked: picked, dim: marked && !picked, tone: tone, lines: lines,
-                            mark: geo.model.criteria[k].markText)
+                let isOpen = motion.openLevel == key
+                let canOpen = isOpen || cut.contains(i)
+                BarLevelRow(level: levels[i], picked: picked, dim: marked && !picked, tone: tone, lines: isOpen ? nil : lines,
+                            more: isOpen ? false : (canOpen ? true : nil), mark: geo.model.criteria[k].markText)
                     .frame(width: rowWidth, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
+                    // (1.3.223) a row cut short opens to all it asks for on a press, and closes on another
+                    .contentShape(Rectangle())
+                    .onTapGesture { if canOpen { motion.toggleLevel(key) } }
+                    .help(canOpen && !isOpen ? levels[i].text : "")
+                    .accessibilityAction(named: isOpen ? "Show Less" : "Show All") { if canOpen { motion.toggleLevel(key) } }
                     .opacity(a)
                     .offset(x: CGFloat((1 - a) * -18) * scale)
                     .position(x: px(RingUnits.rowsX) + rowWidth / 2, y: px(i < places.count ? places[i].row : RingUnits.barTop))
@@ -1367,8 +1419,11 @@ private struct BarLevelRow: View {
     let picked: Bool
     let dim: Bool
     let tone: RingRGB
-    /// How many lines of what it asks for (fewer as the levels crowd the bar; none at all past six).
-    let lines: Int
+    /// How many lines of what it asks for (fewer as the levels crowd the bar; none at all past six); nil, all of them
+    /// (1.3.223: the row opened).
+    let lines: Int?
+    /// (1.3.223) Its words cut short (true: "More", a press shows them all), or shown whole after a press (false: "Less").
+    var more: Bool? = nil
     /// The badge on the one given ("Your mark", "Your mark · 4 pts").
     var mark = "Your mark"
 
@@ -1391,12 +1446,23 @@ private struct BarLevelRow: View {
                         .lineLimit(2)
                     Spacer(minLength: 0)
                     if picked { YourMark(colour: tone, text: mark) }
+                    if let more {
+                        HStack(spacing: 3) {
+                            Text(more ? "More" : "Less")
+                            Image(systemName: more ? "chevron.down" : "chevron.up")
+                                .font(.system(size: 9, weight: .bold))
+                        }
+                        .font(.sCaption.weight(.semibold))
+                        .foregroundStyle(Color.white.opacity(0.62))
+                        .fixedSize()
+                    }
                 }
-                if lines > 0 && !level.text.isEmpty {
+                if (lines ?? 1) > 0 && !level.text.isEmpty {
                     Text(level.text)
                         .font(.sCallout)
                         .foregroundStyle(Color.white.opacity(dim ? 0.55 : 0.78))
                         .lineLimit(lines)
+                        .fixedSize(horizontal: false, vertical: lines == nil)
                 }
             }
             .padding(.horizontal, 12)
