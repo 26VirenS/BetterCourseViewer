@@ -133,6 +133,11 @@ final class Engine: ObservableObject, ShellListener {
     /// Canvas's own page has stood loaded with the app's screens not on it (updateLink).
     private var schoolStillSince: Date?
     private var canvasStillSince: Date?
+    /// (build 69) When the web view last began or finished a page: Finish Login waits until the page has stood still a
+    /// while after it, so a school's sign-in still on its way is never taken for one waiting on the student.
+    private var pageMovedAt = Date()
+    /// (build 69) The one look again at the bar waiting to go (a newer one takes its place).
+    private var linkRecheck: DispatchWorkItem?
 
     init(host: String) {
         self.host = host
@@ -259,6 +264,7 @@ final class Engine: ObservableObject, ShellListener {
     }
 
     private func navigationStarted() {
+        pageMovedAt = Date()
         ready = false
         if asked != nil { asked?.navigated = true }
         tooLong = false // (a page on its way: the sign-in is going somewhere again)
@@ -266,6 +272,7 @@ final class Engine: ObservableObject, ShellListener {
     }
 
     private func pageFinished(_ url: URL?) {
+        pageMovedAt = Date()
         // the school's sign-in, on its own host: nothing of ours runs there to say so
         if phase == .starting, let h = url?.host?.lowercased(), h != host.lowercased() { setPhase(.web) }
         updateLink()
@@ -296,10 +303,15 @@ final class Engine: ObservableObject, ShellListener {
             return
         }
         if case .capture(_, let error) = l.phase {
-            setLink(error.map { .failed($0) } ?? .needsInput)
+            if let error { setLink(.failed(error)); return }
+            // (build 69) a form with nothing saved for it: Finish Login once the page has stopped moving — a form drawn on
+            // a page that goes on by itself (a school's sign-in passing through) is still signing in
+            setLink(stoodStill(for: 3) ? .needsInput : .signingIn)
             return
         }
-        if l.handoff { setLink(.needsInput); return }
+        // (build 69) the page handed to the student (a two-step code, a page with nothing to fill): the same — while the
+        // page is loading, or only just loaded, the sign-in is still on its way
+        if l.handoff { setLink(stoodStill(for: 4) ? .needsInput : .signingIn); return }
         if l.phase == .working {
             schoolStillSince = nil
             setLink(.signingIn)
@@ -312,11 +324,13 @@ final class Engine: ObservableObject, ShellListener {
         if l.onSchoolPage && !web.webView.isLoading {
             let since = schoolStillSince ?? Date()
             schoolStillSince = since
-            if Date().timeIntervalSince(since) >= 2.5 {
+            // (build 69: 6 seconds, not 2.5 — a school's sign-in often goes on by itself after a pause: a redirect its
+            //  script makes, a second factor's frame loading — and the page loaded that long ago, too)
+            if Date().timeIntervalSince(since) >= 6, stoodStill(for: 6) {
                 setLink(.needsInput)
             } else {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.6) { [weak self] in self?.updateLink() }
-                if status.link != .needsInput { setLink(.signingIn) }
+                recheckLink(after: 1)
+                setLink(.signingIn)
             }
             return
         }
@@ -358,6 +372,23 @@ final class Engine: ObservableObject, ShellListener {
         guard status.link != l else { return }
         status.link = l
         if l == .signingIn { armSignInTimer() } else { signInTimer?.cancel() }
+    }
+
+    /// (build 69) Whether the web view has stood still — not loading, and no page begun or finished — for this long; if
+    /// not yet, the bar is looked at again once it may have.
+    private func stoodStill(for seconds: Double) -> Bool {
+        let still = Date().timeIntervalSince(pageMovedAt)
+        if !web.webView.isLoading && still >= seconds { return true }
+        recheckLink(after: web.webView.isLoading ? 1 : max(0.2, seconds - still + 0.1))
+        return false
+    }
+
+    /// (build 69) The bar looked at again in a moment — once, however many times it is asked for meanwhile.
+    private func recheckLink(after seconds: Double) {
+        linkRecheck?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.updateLink() }
+        linkRecheck = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds, execute: work)
     }
 
     /// Signing in for 45 seconds with nothing to show for it: (build 64) begun again by itself, as any sign-in gone wrong is
