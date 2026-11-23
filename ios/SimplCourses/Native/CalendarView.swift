@@ -2,6 +2,8 @@ import SwiftUI
 
 /// Calendar: a month with a dot per course on each day and the day picked listed under it, a week day
 /// by day, or the next three weeks as a list — on the calendars chosen (Canvas shows ten at most).
+/// (1.9 build 68) Find Appointment, by Today (Canvas only): the Mac's sheet on the phone (AppointmentsSheet). A time
+/// reserved there shows on its day as yours, and a swipe gives it back.
 struct CalendarView: View {
     @EnvironmentObject private var engine: Engine
     /// (1.9) Month, week or list: the one last chosen on this phone at once (kept beside the page's own, calView).
@@ -17,6 +19,11 @@ struct CalendarView: View {
     @State private var viewKnown = false
     @State private var loading = false
     @State private var choosing = false
+    /// (build 68) Find Appointment open; a time of yours being given back from its row, and what Canvas said if it
+    /// would not.
+    @State private var finding = false
+    @State private var givingBack: CalEvent?
+    @State private var problem: String?
     /// The way the last move went (the month slides in from that side): set a frame before the move itself,
     /// so the month leaving reads it as it leaves.
     @State private var dir = 1
@@ -74,6 +81,15 @@ struct CalendarView: View {
                     today()
                 }
             }
+            if !engine.onBrightspace {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        Haptics.tap()
+                        finding = true
+                    } label: { Image(systemName: "person.badge.clock") }
+                        .accessibilityLabel("Find Appointment")
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button { choosing = true } label: { Image(systemName: "calendar.badge.checkmark") }
                     .accessibilityLabel("Calendars")
@@ -87,6 +103,8 @@ struct CalendarView: View {
                 viewKnown = true
             }
             await load()
+            // (the simulator suite: -SimplOpen appointments)
+            if LaunchOpen.take("appointments") != nil { finding = true }
         }
         .onChange(of: view) {
             UserDefaults.standard.set(view, forKey: CalendarView.viewKey)
@@ -99,6 +117,34 @@ struct CalendarView: View {
         .sheet(isPresented: $choosing) {
             CalendarsSheet(choices: data?.calendars ?? []) { Task { await load() } }
                 .environmentObject(engine)
+        }
+        .sheet(isPresented: $finding) {
+            AppointmentsSheet { Task { await load() } }
+                .environmentObject(engine)
+        }
+        .confirmationDialog(givingBack.map { "Give back \($0.title)?" } ?? "",
+                            isPresented: Binding(get: { givingBack != nil }, set: { if !$0 { givingBack = nil } }),
+                            titleVisibility: .visible, presenting: givingBack) { ev in
+            Button("Give Back", role: .destructive) { Task { await giveBack(ev) } }
+            Button("Keep It", role: .cancel) {}
+        } message: { ev in
+            Text([ev.time, "The time goes back for someone else to take."].compactMap { $0 }.joined(separator: " · "))
+        }
+        .alert("Not given back", isPresented: Binding(get: { problem != nil }, set: { if !$0 { problem = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: { Text(problem ?? "") }
+    }
+
+    /// (build 68) A time of yours given back, from its row's swipe.
+    private func giveBack(_ ev: CalEvent) async {
+        guard let id = ev.reservationId else { return }
+        let r = try? await engine.call("cancelReservation", ["id": id], as: ActReply.self)
+        if r?.ok == true {
+            Haptics.success()
+            await load()
+        } else {
+            Haptics.error()
+            problem = "\(engine.lmsName) would not give it back: \(r?.error ?? "no answer")."
         }
     }
 
@@ -302,9 +348,20 @@ struct CalendarView: View {
             HStack(spacing: 12) {
                 RoundedRectangle(cornerRadius: 2).fill(Color(hex: ev.color)).frame(width: 4, height: 36)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(ev.title).lineLimit(2)
-                        .strikethrough(ev.done == true && ev.missing != true, color: .secondary)
-                        .foregroundStyle(ev.done == true ? .secondary : .primary)
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(ev.title).lineLimit(2)
+                            .strikethrough(ev.done == true && ev.missing != true, color: .secondary)
+                            .foregroundStyle(ev.done == true ? .secondary : .primary)
+                        // (build 68: a time reserved off Find Appointment)
+                        if ev.reservationId != nil {
+                            Text("Yours")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.green)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 1)
+                                .background(Color.green.opacity(0.15), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+                        }
+                    }
                     if let sub = ev.sub, !sub.isEmpty { Text(sub).font(.footnote).foregroundStyle(.secondary).lineLimit(1) }
                 }
                 Spacer(minLength: 6)
@@ -314,6 +371,12 @@ struct CalendarView: View {
             }
         }
         .buttonStyle(.plain)
+        .swipeActions(edge: .trailing) {
+            if ev.reservationId != nil {
+                Button { givingBack = ev } label: { Label("Give Back", systemImage: "arrow.uturn.backward") }
+                    .tint(.red)
+            }
+        }
     }
 }
 
@@ -375,6 +438,384 @@ struct CalendarsSheet: View {
         Task {
             await engine.act("setCalendars", ["codes": codes])
             changed()
+        }
+    }
+}
+
+// MARK: - Find Appointment
+
+/// (1.9 build 68) Find Appointment on the phone, as the Mac's popup (mac/Simpl/Screens/Appointments.swift) and the web's
+/// sheet have it: Canvas's Scheduler — office hours, conferences, any times a teacher opened — read through the page
+/// (native-app.js `appointments`). The class first, as chips; then each group as a card: its place, how long a time is
+/// and how many each student may hold, the time held (Give Back) and its days, each opening to its times in a grid. A
+/// tap on an open time asks first (a stray tap reserves nothing), then reserves it; Canvas's own words when it will not.
+/// A time reserved goes on the calendar (`changed`).
+struct AppointmentsSheet: View {
+    let changed: () -> Void
+    @EnvironmentObject private var engine: Engine
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var data: AppointmentsData?
+    @State private var course: String?
+    /// The days opened to their times (a day key each): the day held, else the first with a time open, to begin with.
+    @State private var open: Set<String> = []
+    /// The time (or reservation) Canvas is being asked about.
+    @State private var busy: String?
+    @State private var said: String?
+    @State private var saidBad = false
+    /// The time tapped, asked about before it is reserved; the time of yours about to be given back.
+    @State private var asking: Ask?
+    @State private var givingBack: AppointmentHeld?
+
+    struct Ask: Identifiable {
+        let group: AppointmentGroup
+        let day: AppointmentDay
+        let slot: AppointmentSlot
+        var id: String { slot.id }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                content
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 28)
+            }
+            .background(Color(.systemGroupedBackground))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    VStack(spacing: 1) {
+                        Text("Find Appointment").font(.headline)
+                        Text("Office hours and sign-ups").font(.caption).foregroundStyle(.secondary)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { dismiss() } label: { Image(systemName: "xmark") }
+                        .accessibilityLabel("Close")
+                }
+            }
+            .refreshable { await load() }
+        }
+        .task { await load() }
+        .confirmationDialog(asking.map { "Reserve \($0.day.label) at \($0.slot.time)?" } ?? "",
+                            isPresented: Binding(get: { asking != nil }, set: { if !$0 { asking = nil } }),
+                            titleVisibility: .visible, presenting: asking) { a in
+            Button("Reserve") { Task { await reserve(a) } }
+            Button("Cancel", role: .cancel) {}
+        } message: { a in
+            Text(([a.group.title] + Self.meta(a.group, short: true)).joined(separator: " · "))
+        }
+        .confirmationDialog(givingBack.map { "Give back \($0.when)?" } ?? "",
+                            isPresented: Binding(get: { givingBack != nil }, set: { if !$0 { givingBack = nil } }),
+                            titleVisibility: .visible, presenting: givingBack) { held in
+            Button("Give Back", role: .destructive) { Task { await giveBack(held) } }
+            Button("Keep It", role: .cancel) {}
+        } message: { _ in
+            Text("The time goes back for someone else to take.")
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if let d = data {
+            VStack(alignment: .leading, spacing: 12) {
+                if let said { saidLine(said, bad: saidBad) }
+                if let e = d.error { saidLine(e, bad: true) }
+                if d.groups.isEmpty {
+                    if d.error == nil { empty }
+                } else {
+                    if d.classes.count > 1 { classes(d.classes) }
+                    ForEach(shown(d)) { g in card(g) }
+                    Text("A time you reserve goes on your calendar.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 6)
+                }
+            }
+            .padding(.top, 8)
+        } else {
+            ProgressView()
+                .frame(maxWidth: .infinity, minHeight: 320)
+        }
+    }
+
+    private var empty: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "calendar.badge.checkmark")
+                .font(.system(size: 34))
+                .foregroundStyle(.tertiary)
+            Text("Nothing to sign up for right now")
+                .font(.headline)
+            Text("Office hours and conferences your teachers open will wait here.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 60)
+        .padding(.horizontal, 20)
+    }
+
+    private func saidLine(_ text: String, bad: Bool) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Image(systemName: bad ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                .foregroundStyle(bad ? Color.orange : Color.green)
+            Text(text)
+                .font(.subheadline)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background((bad ? Color.orange : Color.green).opacity(0.14), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .transition(.opacity)
+    }
+
+    /// The class first, as Canvas asks: one chip a course with something to sign up for.
+    private func classes(_ list: [AppointmentClass]) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(list) { c in
+                    let on = c.code == pickedClass
+                    Button {
+                        Haptics.select()
+                        withAnimation(reduceMotion ? nil : .snappy) { course = c.code }
+                    } label: {
+                        HStack(spacing: 7) {
+                            Circle().fill(Color(hex: c.color)).frame(width: 8, height: 8)
+                            Text(c.name).lineLimit(1)
+                        }
+                        .font(.subheadline.weight(on ? .semibold : .medium))
+                        .foregroundStyle(on ? Color.accentColor : Color.primary)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Capsule().fill(on ? Color.accentColor.opacity(0.15) : Color(.tertiarySystemFill)))
+                        .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(on ? .isSelected : [])
+                }
+            }
+        }
+        .scrollClipDisabled()
+    }
+
+    private var pickedClass: String? {
+        guard let d = data else { return nil }
+        if let course, d.classes.contains(where: { $0.code == course }) { return course }
+        return d.classes.first?.code
+    }
+
+    private func shown(_ d: AppointmentsData) -> [AppointmentGroup] {
+        guard let code = pickedClass else { return d.groups }
+        return d.groups.filter { $0.codes.contains(code) }
+    }
+
+    /// Where it is, how long a time is, and how many each may hold ("Online · 15 min each · one time each").
+    static func meta(_ g: AppointmentGroup, short: Bool = false) -> [String] {
+        [
+            g.location.flatMap { $0.isEmpty ? nil : $0 },
+            (g.minutes ?? 0) > 0 ? (short ? "\(g.minutes ?? 0) min" : "\(g.minutes ?? 0) min each") : nil,
+            short ? nil : (g.max ?? 0) > 0 ? (g.max == 1 ? "one time each" : "\(g.max ?? 0) times each") : nil,
+        ].compactMap { $0 }
+    }
+
+    private func card(_ g: AppointmentGroup) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        .fill(Color(hex: g.color))
+                        .frame(width: 11, height: 11)
+                    Text(g.title)
+                        .font(.headline)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                let m = Self.meta(g)
+                if !m.isEmpty {
+                    Text(m.joined(separator: " · "))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 21)
+                }
+            }
+            if let desc = g.description, !desc.isEmpty {
+                Text(desc)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(4)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if g.groupSignup == true {
+                Text("A sign-up for your group: reserve it as the group in \(engine.lmsName).")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Button("Open in \(engine.lmsName)") { engine.openWebScreen(g.url ?? "/calendar", title: g.title) }
+                    .buttonStyle(.bordered)
+            } else {
+                ForEach(g.mine) { held in heldRow(held) }
+                VStack(spacing: 0) {
+                    ForEach(Array(g.days.enumerated()), id: \.element.key) { i, day in
+                        if i > 0 { Divider().padding(.leading, 14) }
+                        dayRow(g, day)
+                    }
+                }
+                .background(Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+    }
+
+    private func heldRow(_ held: AppointmentHeld) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.title3)
+                .foregroundStyle(Color.green)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Your time").font(.subheadline.weight(.medium))
+                Text(held.when).font(.footnote).foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            if busy != nil, busy == held.reservationId { ProgressView() }
+            Button("Give Back") { givingBack = held }
+                .buttonStyle(.bordered)
+                .tint(.red)
+                .disabled(busy != nil)
+        }
+        .padding(.leading, 14)
+        .padding(.trailing, 10)
+        .padding(.vertical, 10)
+        .background(Color.green.opacity(0.14), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func dayRow(_ g: AppointmentGroup, _ day: AppointmentDay) -> some View {
+        let isOpen = open.contains(day.key)
+        return VStack(alignment: .leading, spacing: 12) {
+            Button {
+                Haptics.select()
+                withAnimation(reduceMotion ? nil : .snappy) {
+                    if isOpen { open.remove(day.key) } else { open.insert(day.key) }
+                }
+            } label: {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(day.label)
+                        .font(.body.weight(.semibold))
+                    Text(day.sub)
+                        .font(.subheadline)
+                        .foregroundStyle(day.held == true ? Color.green : Color.secondary)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                        .rotationEffect(.degrees(isOpen ? 90 : 0))
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityValue(isOpen ? "Open" : "Closed")
+            if isOpen {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                    ForEach(day.slots) { s in slotButton(g, day, s) }
+                }
+                .transition(.opacity)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+    }
+
+    private func slotButton(_ g: AppointmentGroup, _ day: AppointmentDay, _ s: AppointmentSlot) -> some View {
+        let full = g.full == true
+        let canPick = s.open && !s.reserved && !full && busy == nil
+        let taken = !s.open && !s.reserved
+        return Button {
+            Haptics.tap()
+            asking = Ask(group: g, day: day, slot: s)
+        } label: {
+            HStack(spacing: 4) {
+                if s.reserved {
+                    Image(systemName: "checkmark").font(.caption.weight(.bold))
+                }
+                Text(s.time).strikethrough(taken)
+                if busy == s.id { ProgressView().controlSize(.mini) }
+            }
+            .font(.subheadline.weight(.semibold).monospacedDigit())
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+            .foregroundStyle(s.reserved ? Color.white : canPick ? Color.accentColor : Color.secondary)
+            .frame(maxWidth: .infinity, minHeight: 40)
+            .background {
+                if s.reserved { Capsule().fill(Color.green) }
+                else if canPick { Capsule().fill(Color.accentColor.opacity(0.14)) }
+                else if taken { Capsule().strokeBorder(Color(.separator), lineWidth: 1) }
+                else { Capsule().fill(Color(.quaternarySystemFill)) }
+            }
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(!canPick)
+        .accessibilityLabel(Text("\(day.label), \(s.time), \(s.reserved ? "your time" : s.open ? (full ? "you hold the most times this allows" : "open") : "taken")"))
+    }
+
+    // MARK: - Asking Canvas
+
+    private func load() async {
+        let got = (try? await engine.call("appointments", ["force": true], as: AppointmentsData.self))
+            ?? AppointmentsData(groups: [], classes: [], error: "Appointments could not be loaded.")
+        withAnimation(reduceMotion ? nil : .snappy) {
+            data = got
+            for g in got.groups where !g.days.contains(where: { open.contains($0.key) }) {
+                if let pick = g.days.first(where: { $0.held == true }) ?? g.days.first(where: { ($0.open ?? 0) > 0 }) ?? g.days.first {
+                    open.insert(pick.key)
+                }
+            }
+        }
+    }
+
+    private func reserve(_ a: Ask) async {
+        busy = a.slot.id
+        let r = try? await engine.call("reserveAppointment", ["id": a.slot.id], as: ActReply.self)
+        busy = nil
+        if r?.ok == true {
+            Haptics.success()
+            say("Reserved: \(a.day.label) at \(a.slot.time). It’s on your calendar.", bad: false)
+            changed()
+        } else {
+            Haptics.error()
+            say("\(engine.lmsName) would not reserve that time: \(r?.error ?? "no answer").", bad: true)
+        }
+        await load()
+    }
+
+    private func giveBack(_ held: AppointmentHeld) async {
+        guard let id = held.reservationId else {
+            // (held, Canvas says, but not by which event: its own page can undo it)
+            engine.openWebScreen("/calendar", title: "Calendar")
+            return
+        }
+        busy = id
+        let r = try? await engine.call("cancelReservation", ["id": id], as: ActReply.self)
+        busy = nil
+        if r?.ok == true {
+            Haptics.success()
+            say("Your time is given back.", bad: false)
+            changed()
+        } else {
+            Haptics.error()
+            say("\(engine.lmsName) would not give it back: \(r?.error ?? "no answer").", bad: true)
+        }
+        await load()
+    }
+
+    private func say(_ text: String, bad: Bool) {
+        withAnimation(reduceMotion ? nil : .snappy) {
+            said = text
+            saidBad = bad
         }
     }
 }

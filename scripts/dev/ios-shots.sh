@@ -75,6 +75,7 @@ for mode in light dark; do
   launch "$mode-03-todo" 14 -SimplTab todo
   launch "$mode-04-grades" 16 -SimplTab grades
   launch "$mode-05-calendar" 14 -SimplTab calendar
+  launch "$mode-05b-appointments" 18 -SimplTab calendar -SimplOpen appointments # (1.9 build 68: Find Appointment)
   launch "$mode-06-search" 10 -SimplTab search
   launch "$mode-07-sheet-next" 16 -SimplSheet next
   launch "$mode-08-notifications" 16 -SimplPush notifications
