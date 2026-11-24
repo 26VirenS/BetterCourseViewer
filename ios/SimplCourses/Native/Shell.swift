@@ -275,7 +275,7 @@ struct NativeShell: View {
 /// the tab's own companion (SplitHome): Notifications beside Today, the Calendar beside To Do, the first course's grades
 /// beside Grades.
 /// (Build 41) Courses instead puts a course's home on the left, the courses a strip at its top, and what is opened from
-/// it (else its grades) on the right. Compact (a phone, the Duo folded, the Duo open upright — two columns there would each be narrower than any
+/// it (else its first page: its announcements, build 71) on the right. Compact (a phone, the Duo folded, the Duo open upright — two columns there would each be narrower than any
 /// iPhone), the split view collapses into one stack, the list then what was opened, as Apple's own apps do — and as it
 /// folds and unfolds it keeps what is open: the screen, a sheet or a menu on it, where it is scrolled. iOS places each
 /// column's bars itself (on the Duo, in its rail) and keeps them clear of the fold. The list column's edge sits on the
@@ -298,10 +298,7 @@ struct TabSplit<Root: View>: View {
     /// open course's home on the left (the other courses behind a button at its top, CourseSwitcher) and what is opened
     /// from it on the right — the whole list of courses down the left was a poor use of half the screen. Otherwise the
     /// tab's own list is on the left (0).
-    private func leadCount(_ path: [Route], two: Bool) -> Int {
-        guard two, tab == .courses, case .course? = path.first else { return 0 }
-        return 1
-    }
+    private func leadCount(_ path: [Route], two: Bool) -> Int { Engine.splitLead(tab, path, two: two) }
 
     var body: some View {
         let path = engine.paths[tab]
@@ -336,7 +333,7 @@ struct TabSplit<Root: View>: View {
                 // what is opened pushed over it — so it has a Back button and the swipe back, to the companion. (Builds
                 // 37–53 made what was opened the stack's first screen: nothing under it, no Back, no swipe — an
                 // announcement opened beside Today could not be left.)
-                NavigationStack(path: rest(from: lead)) {
+                NavigationStack(path: rightStack) {
                     companion(path, lead: lead)
                         .navigationDestination(for: Route.self) { route in RouteScreen(route: route).id(route) } // (build 62: a screen of its own per address — another course in its place is a new one, not the last one's)
                 }
@@ -364,8 +361,13 @@ struct TabSplit<Root: View>: View {
         .onChange(of: two, initial: true) { _, on in
             if !on { engine.splitEdge[tab] = nil }
             if on { visibility = .all }
+            // (build 71) Courses opening into two columns with a course opened over another screen (one course's
+            // home from another's, on the phone folded): the last course takes the left, its home never on the right
+            let p = engine.paths[tab]
+            if on, tab == .courses, let i = p.lastIndex(where: { if case .course = $0 { return true } else { return false } }), i > 0 {
+                engine.paths[tab] = Array(p[i...])
+            }
         }
-        .onChange(of: lead, initial: true) { _, n in engine.splitLead[tab] = n }
         // (build 41) Courses opened with two columns and no course yet: the first course's home on the left
         .task(id: two && path.isEmpty) {
             guard tab == .courses, two else { return }
@@ -378,12 +380,12 @@ struct TabSplit<Root: View>: View {
         }
     }
 
-    /// (Build 54) The right column's own page with nothing opened over it: a course's grades beside its home (Courses), the
-    /// tab's companion otherwise (SplitHome).
+    /// (Build 54) The right column's own page with nothing opened over it: a course's first page beside its home (Courses —
+    /// its announcements, build 71; its grades before), the tab's companion otherwise (SplitHome).
     @ViewBuilder
     private func companion(_ path: [Route], lead: Int) -> some View {
         if lead == 1, case .course(let id)? = path.first {
-            CourseGradesView(courseId: id)
+            RouteScreen(route: Engine.firstPage(ofCourse: id))
         } else {
             SplitHome(tab: tab)
         }
@@ -396,9 +398,17 @@ struct TabSplit<Root: View>: View {
     }
 
     /// (Build 54) What is opened over the right column's companion: the tab's stack past what the left column shows.
-    private func rest(from lead: Int) -> Binding<[Route]> {
-        Binding(get: { Array(engine.paths[tab].dropFirst(lead)) }, set: { more in
-            engine.paths[tab] = Array(engine.paths[tab].prefix(lead)) + more
+    /// (Build 71) What the left column shows is worked out from the stack as it is when the right column reads it, not
+    /// as it was when the column was drawn: a course opened with the list on the left (by the list, or Courses opening on
+    /// the first course) was read by the right column still drawn for the list as something opened over it, and its home
+    /// stayed there, a second time, with a Back button.
+    private var rightStack: Binding<[Route]> {
+        Binding(get: {
+            let p = engine.paths[tab]
+            return Array(p.dropFirst(Engine.splitLead(tab, p, two: true)))
+        }, set: { more in
+            let p = engine.paths[tab]
+            engine.paths[tab] = Array(p.prefix(Engine.splitLead(tab, p, two: true))) + more
         })
     }
 

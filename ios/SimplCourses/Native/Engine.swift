@@ -844,22 +844,44 @@ final class Engine: ObservableObject, ShellListener {
     /// (iPhone 1.8.1, build 37) Per tab, where its split view's list column ends (window x) while two columns show; nil
     /// when the split view is one stack (TabSplit).
     var splitEdge: [AppTab: CGFloat] = [:]
-    /// (iPhone 1.8.1, build 41) Per tab, how many of its stack's first screens the left column shows itself while two
-    /// columns show: 1 for Courses with a course open (its home on the left, TabSplit), 0 otherwise (the tab's own list).
-    var splitLead: [AppTab: Int] = [:]
+
+    /// (iPhone 1.9, build 71) A course's first page: what the right column of Courses' split view shows beside the
+    /// course's home with nothing opened over it (TabSplit) — its announcements (builds 54–70: its grades).
+    static func firstPage(ofCourse id: String) -> Route { .section(ctx: "courses/\(id)", kind: "announcements") }
+
+    /// (Build 41) How many of a tab's stack's first screens the left column shows itself while two columns show: 1 for
+    /// Courses with a course open (its home on the left, TabSplit), 0 otherwise (the tab's own list). (Build 71) Worked
+    /// out from the stack as it stands, never kept from the last time the split view was drawn.
+    static func splitLead(_ tab: AppTab, _ path: [Route], two: Bool) -> Int {
+        guard two, tab == .courses, case .course? = path.first else { return 0 }
+        return 1
+    }
 
     /// A native screen on the stack showing (not twice in a row). (1.8.1, build 37) With the split view showing two
     /// columns, a screen opened from the left column — another assignment in Today, a section of the course whose home
     /// is there — is the right column's own, in place of whatever was open there (as a row picked in Mail's list);
     /// opened from the right column, it is pushed there. (Build 41) Another course opened while a course's home is on
-    /// the left takes the left's place.
+    /// the left takes the left's place. (Build 71) A course opened on Courses with two columns always takes the left —
+    /// its home there never also on the right — and a screen already on the stack is gone back to rather than opened
+    /// again over itself (the course's first page beside its home among them).
     func push(_ route: Route) {
         var path = paths[tab]
         if path.last == route { return }
-        let lead = splitEdge[tab] == nil ? 0 : (splitLead[tab] ?? 0)
-        if lead > 0, case .course = route {
+        let two = splitEdge[tab] != nil
+        if two, tab == .courses, case .course = route {
             lastTouch = nil
             paths[tab] = [route]
+            return
+        }
+        let lead = Engine.splitLead(tab, path, two: two)
+        if lead == 1, case .course(let id)? = path.first, route == Engine.firstPage(ofCourse: id) {
+            lastTouch = nil
+            paths[tab] = [path[0]]
+            return
+        }
+        if let i = path.firstIndex(of: route) {
+            lastTouch = nil
+            paths[tab] = Array(path.prefix(i + 1))
             return
         }
         if let edge = splitEdge[tab], let t = lastTouch, Date().timeIntervalSince(t.at) < 3, t.x < edge {
@@ -1291,10 +1313,11 @@ final class ReadAhead {
         ]
         if !engine.onBrightspace { list.append(Read(name: "inbox", args: ["scope": "inbox"], every: 600)) }
         list.append(Read(name: "coursesProgress", args: [:], every: 900))
-        // each course chosen: its home and its grades (the courses as last read)
+        // each course chosen: its home, its first page (its announcements, build 71) and its grades (the courses as last read)
         if let courses = engine.saved("courses", as: CoursesData.self) {
             for c in courses.rows.prefix(12) {
                 list.append(Read(name: "home", args: ["ctx": "courses/\(c.id)"], every: 900))
+                list.append(Read(name: "announcements", args: ["ctx": "courses/\(c.id)"], every: 900))
                 list.append(Read(name: "courseGrades", args: ["id": c.id], every: 900))
             }
         }
