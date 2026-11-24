@@ -1045,6 +1045,12 @@ Mac's Safari). `scripts/dev/make-mac-project.py` lists them (`SHARED`); run it a
   `light-36d-external-tools-list-reread` (`-SimplExternalToolReread YES`) reads the tools again under Knewton Alta's
   open list; `tool_list_check` writes `tool-list-check.txt` from the consoles (`[Simpl] tool list room: …`, `read
   again; … still open`).
+- **Large popups follow their window a turn later (1.3.224).** A window sized again sizes its large popups again
+  (`FloatingPopups.windowResized`) on the run loop's next turn, not inside the window's own layout pass, and only once
+  it has changed by 3 points or more since they were last sized (exactly once its edge is let go:
+  `didEndLiveResizeNotification`). The screenshot run's main window, as tall as the screen, was sized 2 points smaller
+  by SwiftUI each time the rubric popup over it (a level's whole words open, `light-32c-rubric-level-whole`) was sized
+  again inside that pass, until AppKit stopped the app.
 - **The Chemistry section (1.3.80).** The Periodic Table is split into four tools under a *Chemistry* heading on the
   Tools page, just before Biology and built as its section is (`Tools/Chemistry/ChemTools.swift`: `ChemTools.kinds`,
   `info` — names, lines, symbols and a palette of their own — and `ChemToolsSection`, which `-SimplToolsScroll

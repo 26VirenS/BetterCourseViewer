@@ -358,6 +358,10 @@ final class FloatingPopups {
     static let changed = Notification.Name("SimplPopupsChanged")
     private var watches: [NSObjectProtocol] = []
     private weak var watched: NSWindow?
+    /// (1.3.224) The window's size its large popups were last sized for, and whether they are to be sized again on the run
+    /// loop's next turn (`windowResized`).
+    private var sizedFor: CGSize?
+    private var resizeQueued = false
 
     /// The room round a popup, in the screen's side of the window.
     static let margin: CGFloat = 20
@@ -508,6 +512,7 @@ final class FloatingPopups {
             let others = panels.values.filter { $0 !== panel && $0.popupLayout.isLarge }.count
             panel.cascade = CGFloat(others) * 28
             panel.moved = CGSize(width: panel.cascade / 2, height: -panel.cascade / 2)
+            sizedFor = window.frame.size
             panel.place()
             panel.comeIn()
             panel.placeAgainSoon()
@@ -521,6 +526,7 @@ final class FloatingPopups {
         guard watched !== window else { return }
         for w in watches { NotificationCenter.default.removeObserver(w) }
         watched = window
+        sizedFor = nil
         let center = NotificationCenter.default
         watches = [
             center.addObserver(forName: NSWindow.didResizeNotification, object: window, queue: .main) { [weak self] _ in
@@ -533,11 +539,32 @@ final class FloatingPopups {
                     if let self { self.closeAll() }
                 }
             },
+            // (1.3.224: let go of its edge, its large popups sized to it exactly)
+            center.addObserver(forName: NSWindow.didEndLiveResizeNotification, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    if let self { self.windowResized(exactly: true) }
+                }
+            },
         ]
     }
 
-    private func windowResized() {
-        for panel in panels.values where panel.popupLayout.isLarge { panel.place() }
+    /// The window sized again: its large popups too — (1.3.224) on the run loop's next turn, not inside the window's own
+    /// layout pass, and only once it has changed by 3 points or more since they were last sized (exactly, once its edge
+    /// is let go). A window that SwiftUI sized 2 points smaller each time a popup over it was sized again (the rubric with
+    /// a level's whole words open, in a screenshot's run) had the popup sized again inside that pass, pass after pass,
+    /// until AppKit stopped the app ("more Update Constraints in Window passes than there are views").
+    private func windowResized(exactly: Bool = false) {
+        guard let window = watched else { return }
+        let size = window.frame.size
+        if !exactly, let last = sizedFor, abs(last.width - size.width) < 3, abs(last.height - size.height) < 3 { return }
+        guard !resizeQueued else { return }
+        resizeQueued = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.resizeQueued = false
+            self.sizedFor = self.watched?.frame.size
+            for panel in self.panels.values where panel.popupLayout.isLarge { panel.place() }
+        }
     }
 
     /// (1.3.79) The window's sidebar is out, as the window last said (`sidebarMoved`): a fitted popup is centred clear of
