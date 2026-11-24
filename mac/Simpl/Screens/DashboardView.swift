@@ -224,8 +224,9 @@ struct DashboardView: View {
     // MARK: - Counters
 
     /// The counters in rows (1.3.80: as 1.3.77 had them again) — six across where the page has room for six, else three,
-    /// or two on a very narrow page — each tile as tall as what is on it, and every tile in a row as tall as the row's
-    /// tallest (not the squares of 1.3.79). (1.2.8) A counter opened grows out of its own tile into a panel that floats
+    /// or two on a very narrow page. (1.3.224) Each tile a square, however narrow the page: a narrow page's tiles grew
+    /// taller than wide, their names wrapping over their symbols (the owner: "the squares should still be squares"). The
+    /// tile fits its words to its square (DashCounterTile.side). (1.2.8) A counter opened grows out of its own tile into a panel that floats
     /// over the page — as wide as a panel needs, not the page — over its tile, placed by where the tile is (1.3.16): the
     /// left-most tile's panel from its left edge, the right-most's from its right, one in the middle centred on it, each
     /// kept on the page; nothing under it moves. Closed, it folds back into its tile. (1.3.80: the popup over the window
@@ -289,17 +290,17 @@ struct DashboardView: View {
     /// The room between two tiles, across and down.
     static let counterSpacing: CGFloat = 14
 
-    /// A row of tiles: each as tall as the row's tallest, which is as tall as what is on it.
+    /// A row of tiles, (1.3.224) each a square as wide as the row gives it.
     private func counterRow(_ row: [Counter], cols: Int, style: DashCounterTile.Style, tile: CGFloat, lines: Int) -> some View {
         HStack(alignment: .top, spacing: Self.counterSpacing) {
             ForEach(row) { c in
-                counterSlot(c, style: style, tile: tile, lines: lines).frame(maxWidth: .infinity, maxHeight: .infinity)
+                counterSlot(c, style: style, tile: tile, lines: lines).frame(maxWidth: .infinity)
             }
             ForEach(0..<max(cols - row.count, 0), id: \.self) { _ in
                 Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
             }
         }
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(height: max(0, tile.rounded(.down)))
     }
 
     /// (home-17) How a row of tiles lays out their names, decided once for the row where it measures them. (M17) Always
@@ -323,12 +324,12 @@ struct DashboardView: View {
         Group {
             if open == c.key {
                 DashCounterTile(counter: c, name: name, value: value(c), note: line, stale: stale(c), style: style,
-                                width: tile, lines: lines, tip: fullNote(c)) {}
+                                width: tile, lines: lines, tip: fullNote(c), side: tile) {}
                     .hidden()
                     .accessibilityHidden(true)
             } else {
                 DashCounterTile(counter: c, name: name, value: value(c), note: line, stale: stale(c), style: style,
-                                width: tile, lines: lines, tip: fullNote(c)) { setOpen(open == c.key ? nil : c.key) }
+                                width: tile, lines: lines, tip: fullNote(c), side: tile) { setOpen(open == c.key ? nil : c.key) }
                     .tourSpot(c.key == "next" ? .counterNext : nil)
                     .dashMorph(c.key, in: morph, enabled: grows)
                     .transition(.opacity)

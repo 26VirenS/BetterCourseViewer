@@ -136,7 +136,8 @@ struct DashCount: View {
 
 /// A counter's tile, as 1.3.77 drew it (1.3.79: brought back from the compact strip of 1.3.78): its symbol in its
 /// colour and its name, its number, and the line under it, whole — over its photo, whole too. (1.3.80) As tall as what
-/// is on it (the row makes every tile in it as tall as its tallest), and washed with its own colour.
+/// is on it (the row makes every tile in it as tall as its tallest), and washed with its own colour. (1.3.224) In the
+/// Dashboard's rows, a square (`side`): its number at its foot, its words set a little smaller where the square is small.
 struct DashCounterTile: View {
     /// How its head is laid out: its symbol beside its name, as 1.3.77's; or, in a tile too narrow for both on one line,
     /// its symbol over its name.
@@ -160,6 +161,10 @@ struct DashCounterTile: View {
     var lines = 2
     /// (1.3.79) What it counts, in full words, for its tooltip with its count: a line left out stays said there.
     var tip: String? = nil
+    /// (1.3.224) The square it is, as the row lays it out (`side` across and down): its number at the foot, its words
+    /// and number set a little smaller where all of it would not fit, the line under the number left out first. 0: as
+    /// tall as what is on it.
+    var side: CGFloat = 0
     let action: () -> Void
     /// (1.3.1) Its photo's editor, from its context menu.
     @State private var editing = false
@@ -176,21 +181,32 @@ struct DashCounterTile: View {
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+        let fit = fitting
         Button(action: { if !appearanceMode.on { action() } }) {
-            VStack(alignment: .leading, spacing: 6) {
-                head
-                DashCount(value: value, alert: alert, stale: stale)
-                Text(shownNote ?? " ")
-                    .font(.sCaption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .opacity(stale ? 0.6 : 1)
+            VStack(alignment: .leading, spacing: 6 * fit.k) {
+                head(fit.k)
+                if side > 0 { Spacer(minLength: 0) }
+                // (1.3.224: in a narrow square, its symbol beside its number — over its name it left the number no room)
+                HStack(alignment: .lastTextBaseline, spacing: 4) {
+                    DashCount(value: value, alert: alert, stale: stale, size: 34 * fit.k)
+                    if side > 0 && style == .over {
+                        Spacer(minLength: 0)
+                        symbol(fit.k)
+                    }
+                }
+                if side == 0 || fit.note {
+                    Text(fit.note ? (shownNote ?? " ") : " ")
+                        .font(.system(size: 12 * fit.k))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .opacity(stale ? 0.6 : 1)
+                }
             }
             // (1.3.164; M22: over a photo with its Ink off, the words on a frosted plate of their own, in their usual colours)
             .plainPhotoWords(plain)
             .padding(.horizontal, Self.padding(style))
-            .padding(.vertical, 14)
+            .padding(.vertical, 14 * fit.k)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background {
                 // (1.3.1) its photo, frosted under its words, the whole tile over (Settings ▸ Appearance, or its context
@@ -258,16 +274,21 @@ struct DashCounterTile: View {
             .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
-    /// Its symbol beside its name (1.3.77's), or over it in a tile too narrow for both on one line.
-    @ViewBuilder
-    private var head: some View {
-        let symbol = Image(systemName: DashCounterLook.symbol(counter.key))
-            .font(.system(size: 14, weight: .semibold))
+    /// Its symbol in its colour.
+    private func symbol(_ k: CGFloat) -> some View {
+        Image(systemName: DashCounterLook.symbol(counter.key))
+            .font(.system(size: 14 * k, weight: .semibold))
             .foregroundStyle(DashCounterLook.color(counter.key))
+    }
+
+    /// Its symbol beside its name (1.3.77's), or over it in a tile too narrow for both on one line — (1.3.224) in a
+    /// square, its name alone, the symbol beside the number.
+    @ViewBuilder
+    private func head(_ k: CGFloat) -> some View {
         // (M17: its full name always — over its symbol in a narrow tile, on a second line where it must, else a little
         //  smaller; never cut short)
         let title = Text(name)
-            .font(style == .over ? .system(size: nameSize, weight: .medium) : .sCallout.weight(.medium))
+            .font(style == .over ? .system(size: nameSize * k, weight: .medium) : .system(size: 14 * k, weight: .medium))
             .foregroundStyle(.secondary)
             .lineLimit(style == .beside ? 1 : 2)
             .minimumScaleFactor(style == .beside ? 0.85 : 0.75) // (a sidebar dragged wide: smaller, never cut short)
@@ -275,15 +296,50 @@ struct DashCounterTile: View {
         switch style {
         case .beside:
             HStack(spacing: 7) {
-                symbol
+                symbol(k)
                 title
             }
         case .over:
-            VStack(alignment: .leading, spacing: 4) {
-                symbol
+            if side > 0 {
                 title
+            } else {
+                VStack(alignment: .leading, spacing: 4) {
+                    symbol(k)
+                    title
+                }
             }
         }
+    }
+
+    /// (1.3.224) How it fits its square: the size its words and number are set at (1 as they are, down to 0.7), and
+    /// whether the line under the number has room. All of it as it is where it fits; else the line left out; else the
+    /// rest set smaller until it does.
+    private var fitting: (k: CGFloat, note: Bool) {
+        guard side > 0 else { return (1, true) }
+        let hasNote = shownNote != nil
+        let bare = naturalHeight(note: false)
+        if hasNote, naturalHeight(note: true) <= side { return (1, true) }
+        if bare <= side { return (1, false) }
+        return (max(0.7, side / bare), false)
+    }
+
+    /// (1.3.224) How tall it stands with nothing set smaller: its padding, its head, its number and (`note`) the line
+    /// under it — line heights as the system font sets them (1.19 of the size).
+    private func naturalHeight(note: Bool) -> CGFloat {
+        let line: (CGFloat) -> CGFloat = { ($0 * 1.19).rounded(.up) }
+        var head: CGFloat
+        switch style {
+        case .beside:
+            head = line(14)
+        case .over:
+            let font = NSFont.systemFont(ofSize: nameSize, weight: .medium)
+            let room = max(1, width - Self.padding(style) * 2 - 2)
+            let wide = (name as NSString).size(withAttributes: [.font: font]).width
+            head = line(nameSize) * (wide > room ? 2 : 1)
+        }
+        var h = 14 * 2 + head + 6 + line(34)
+        if note { h += 6 + line(12) * CGFloat(lines) }
+        return h
     }
 
     /// (1.3.79) The line under the number, whole in up to two lines at the tile's width (1.3.80: in one, in a row of
