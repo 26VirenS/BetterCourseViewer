@@ -165,6 +165,9 @@ struct DashCounterTile: View {
     /// and number set a little smaller where all of it would not fit, the line under the number left out first. 0: as
     /// tall as what is on it.
     var side: CGFloat = 0
+    /// (1.3.224) How its row sets the words of every square in it (`squareFit`): one size for every name and one scale
+    /// for all, so the names start on one line and the numbers stand on one. nil: it measures itself.
+    var fit: SquareFit? = nil
     let action: () -> Void
     /// (1.3.1) Its photo's editor, from its context menu.
     @State private var editing = false
@@ -200,6 +203,8 @@ struct DashCounterTile: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
+                        // (in a square, as tall as the row's longest line may be, whatever this one's: the numbers on one line)
+                        .frame(height: side > 0 ? Self.lineHeight(12 * fit.k) * CGFloat(lines) : nil, alignment: .topLeading)
                         .opacity(stale ? 0.6 : 1)
                 }
             }
@@ -287,11 +292,16 @@ struct DashCounterTile: View {
     private func head(_ k: CGFloat) -> some View {
         // (M17: its full name always — over its symbol in a narrow tile, on a second line where it must, else a little
         //  smaller; never cut short)
-        let title = Text(name)
-            .font(style == .over ? .system(size: nameSize * k, weight: .medium) : .system(size: 14 * k, weight: .medium))
+        // (1.3.224: in a square, the row's one size for every name, a word too long for it broken where the language
+        //  breaks it, with a hyphen — "Announce- / ments" — rather than this one name alone set smaller)
+        let rowFit = side > 0 ? fit : nil
+        let size = rowFit?.nameSize ?? (style == .over ? nameSize : 14)
+        let words = rowFit.map { _ in Self.hyphenated(name, size: size, room: Self.nameRoom(width, style)) } ?? name
+        let title = Text(words)
+            .font(.system(size: size * k, weight: .medium))
             .foregroundStyle(.secondary)
-            .lineLimit(style == .beside ? 1 : 2)
-            .minimumScaleFactor(style == .beside ? 0.85 : 0.75) // (a sidebar dragged wide: smaller, never cut short)
+            .lineLimit(style == .beside ? 1 : (rowFit == nil ? 2 : 3))
+            .minimumScaleFactor(rowFit != nil ? 1 : (style == .beside ? 0.85 : 0.75)) // (a sidebar dragged wide: smaller, never cut short)
             .fixedSize(horizontal: false, vertical: true)
         switch style {
         case .beside:
@@ -316,6 +326,7 @@ struct DashCounterTile: View {
     /// rest set smaller until it does.
     private var fitting: (k: CGFloat, note: Bool) {
         guard side > 0 else { return (1, true) }
+        if let fit { return (fit.k, fit.notes) }
         let hasNote = shownNote != nil
         let bare = naturalHeight(note: false)
         if hasNote, naturalHeight(note: true) <= side { return (1, true) }
@@ -371,6 +382,77 @@ struct DashCounterTile: View {
 
     /// The tile's side padding: 1.3.77's 14 points; 12 where its symbol stands over its name (the narrowest tiles).
     static func padding(_ style: Style) -> CGFloat { style == .beside ? 14 : 12 }
+
+    // MARK: - A row of squares (1.3.224)
+
+    /// How a row of square tiles sets its words, decided once for every tile in it.
+    struct SquareFit: Equatable {
+        /// Every name's size: 14 points, or less, down to 12, where a word of one would not fit a line of its tile.
+        var nameSize: CGFloat = 14
+        /// The scale of every tile's words and number (1, or down to 0.7 where the tallest of them would not fit).
+        var k: CGFloat = 1
+        /// Whether the lines under the numbers show (each tile keeps their room, its own line or not).
+        var notes = true
+    }
+
+    /// The row's fit for squares `side` across: its names at one size (the largest from 14 down to 12 at which each word
+    /// of every name fits a line; a word that still does not is hyphenated), and its lines under the numbers where every
+    /// tile has room for the tallest name, its number and them — else none, and everything set smaller where even the
+    /// tallest name and its number do not fit.
+    static func squareFit(names: [String], notes: [String?], side: CGFloat, style: Style, lines: Int) -> SquareFit {
+        guard side > 0 else { return SquareFit() }
+        let room = nameRoom(side, style)
+        var size: CGFloat = 14
+        if style == .over {
+            let words = names.flatMap { $0.split(separator: " ").map(String.init) }
+            while size > 12, words.contains(where: { textWidth($0, size: size) > room }) { size -= 1 }
+        }
+        let heads = names.map { style == .beside ? lineHeight(size) : lineHeight(size) * CGFloat(nameLines(hyphenated($0, size: size, room: room), size: size, room: room)) }
+        let bare = 14 * 2 + (heads.max() ?? lineHeight(size)) + 6 + lineHeight(34)
+        let anyNote = notes.contains { !($0 ?? "").isEmpty }
+        if anyNote, bare + 6 + lineHeight(12) * CGFloat(lines) <= side { return SquareFit(nameSize: size, k: 1, notes: true) }
+        return SquareFit(nameSize: size, k: max(0.7, min(1, side / bare)), notes: false)
+    }
+
+    /// The room a name has across its tile.
+    static func nameRoom(_ width: CGFloat, _ style: Style) -> CGFloat { max(1, width - padding(style) * 2 - 2) }
+
+    /// A line's height in the system font at `size` (1.19 of it).
+    static func lineHeight(_ size: CGFloat) -> CGFloat { (size * 1.19).rounded(.up) }
+
+    private static func textWidth(_ s: String, size: CGFloat) -> CGFloat {
+        (s as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: size, weight: .medium)]).width
+    }
+
+    /// How many lines a name takes `room` wide at `size`.
+    static func nameLines(_ text: String, size: CGFloat, room: CGFloat) -> Int {
+        let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: size, weight: .medium)]
+        let box = NSSize(width: room, height: .greatestFiniteMagnitude)
+        let options: NSString.DrawingOptions = [.usesLineFragmentOrigin, .usesFontLeading]
+        let one = ("Ag" as NSString).boundingRect(with: box, options: options, attributes: attrs).height
+        let all = (text as NSString).boundingRect(with: box, options: options, attributes: attrs).height
+        return max(1, Int((all / max(one, 1)).rounded()))
+    }
+
+    /// A name with each word too wide for a line `room` across at `size` broken where English breaks it, a hyphen at
+    /// the end of its first part ("Announce-" / "ments") — never cut, never broken where the language would not.
+    static func hyphenated(_ name: String, size: CGFloat, room: CGFloat) -> String {
+        let locale = Locale(identifier: "en_US") as CFLocale
+        return name.split(separator: " ").map { part -> String in
+            let word = String(part)
+            guard textWidth(word, size: size) > room else { return word }
+            let ns = word as NSString
+            let cf = word as CFString
+            var before = ns.length
+            while true {
+                let at = CFStringGetHyphenationLocationBeforeIndex(cf, before, CFRange(location: 0, length: ns.length), 0, locale, nil)
+                if at == kCFNotFound || at <= 0 || at >= before { return word }
+                let head = ns.substring(to: at)
+                if textWidth(head + "-", size: size) <= room { return head + "-\n" + ns.substring(from: at) }
+                before = at
+            }
+        }.joined(separator: " ")
+    }
 
     /// (home-17) Whether every name has room on a tile `tileWidth` across as the tile draws it — beside its symbol, or on
     /// a line of its own under it — so the row decides once for all six and no name is ever cut short.

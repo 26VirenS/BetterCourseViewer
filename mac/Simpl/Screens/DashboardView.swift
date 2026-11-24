@@ -242,9 +242,13 @@ struct DashboardView: View {
         // (a tile's line on one line in a row of six — the row as low as 1.3.77's, a line too long for it left to the
         //  tooltip (1.3.218: not wrapped, which made every tile in the row taller); on two at most in a row of three or two)
         let lines = cols == 6 ? 1 : 2
+        // (1.3.224) every square's words set once for all of them: one size for the names, one scale, the lines under the
+        // numbers in all or none — so the names start on one line and the numbers stand on one
+        let fit = DashCounterTile.squareFit(names: list.map { $0.fullLabel ?? $0.label }, notes: list.map { fullNote($0) },
+                                            side: tile, style: style, lines: lines)
         return VStack(alignment: .leading, spacing: Self.counterSpacing) {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                counterRow(row, cols: cols, style: style, tile: tile, lines: lines)
+                counterRow(row, cols: cols, style: style, tile: tile, lines: lines, fit: fit)
             }
         }
         .tourSpot(.counters) // (the tour's first step: everything due, at a glance)
@@ -291,10 +295,10 @@ struct DashboardView: View {
     static let counterSpacing: CGFloat = 14
 
     /// A row of tiles, (1.3.224) each a square as wide as the row gives it.
-    private func counterRow(_ row: [Counter], cols: Int, style: DashCounterTile.Style, tile: CGFloat, lines: Int) -> some View {
+    private func counterRow(_ row: [Counter], cols: Int, style: DashCounterTile.Style, tile: CGFloat, lines: Int, fit: DashCounterTile.SquareFit) -> some View {
         HStack(alignment: .top, spacing: Self.counterSpacing) {
             ForEach(row) { c in
-                counterSlot(c, style: style, tile: tile, lines: lines).frame(maxWidth: .infinity)
+                counterSlot(c, style: style, tile: tile, lines: lines, fit: fit).frame(maxWidth: .infinity)
             }
             ForEach(0..<max(cols - row.count, 0), id: \.self) { _ in
                 Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
@@ -318,18 +322,18 @@ struct DashboardView: View {
     /// it, and back — 1.3.80: the tile no longer stays under it, its coloured edge showing round the panel's rounder
     /// corners.)
     @ViewBuilder
-    private func counterSlot(_ c: Counter, style: DashCounterTile.Style, tile: CGFloat, lines: Int) -> some View {
+    private func counterSlot(_ c: Counter, style: DashCounterTile.Style, tile: CGFloat, lines: Int, fit: DashCounterTile.SquareFit) -> some View {
         let name = c.fullLabel ?? c.label
         let line = fullNote(c)
         Group {
             if open == c.key {
                 DashCounterTile(counter: c, name: name, value: value(c), note: line, stale: stale(c), style: style,
-                                width: tile, lines: lines, tip: fullNote(c), side: tile) {}
+                                width: tile, lines: lines, tip: fullNote(c), side: tile, fit: fit) {}
                     .hidden()
                     .accessibilityHidden(true)
             } else {
                 DashCounterTile(counter: c, name: name, value: value(c), note: line, stale: stale(c), style: style,
-                                width: tile, lines: lines, tip: fullNote(c), side: tile) { setOpen(open == c.key ? nil : c.key) }
+                                width: tile, lines: lines, tip: fullNote(c), side: tile, fit: fit) { setOpen(open == c.key ? nil : c.key) }
                     .tourSpot(c.key == "next" ? .counterNext : nil)
                     .dashMorph(c.key, in: morph, enabled: grows)
                     .transition(.opacity)
