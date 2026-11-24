@@ -162,6 +162,26 @@ struct CalendarView: View {
         }
     }
 
+    /// (build 70) What the calendar asks for as it opens on today, in the view last chosen — read ahead (ReadAhead).
+    static func readAheadArgs() -> [String: Any] {
+        let view = UserDefaults.standard.string(forKey: viewKey) ?? "month"
+        let now = Date()
+        let s: Date, e: Date
+        switch view {
+        case "week":
+            s = sunday(now)
+            e = cal.date(byAdding: .day, value: 7, to: s) ?? s
+        case "list":
+            s = cal.startOfDay(for: now)
+            e = cal.date(byAdding: .day, value: 21, to: s) ?? s
+        default:
+            s = sunday(monthStart(now))
+            e = cal.date(byAdding: .day, value: 42, to: s) ?? s
+        }
+        let iso = ISO8601DateFormatter()
+        return ["from": iso.string(from: s), "to": iso.string(from: e)]
+    }
+
     private var range: (Date, Date) {
         switch view {
         case "week": return (weekStart, Self.cal.date(byAdding: .day, value: 7, to: weekStart)!)

@@ -166,6 +166,8 @@ final class Engine: ObservableObject, ShellListener {
                 self?.updateLink()
             }
         }
+        // (build 70) the other screens read ahead while the student is on one, unseen
+        ReadAhead.shared.start(self)
         // the simulator suite's screens (.github/workflows/ios-shots.yml): -SimplTab courses
         if let t = UserDefaults.standard.string(forKey: "SimplTab") {
             if t == "calendar" { tab = .todo; paths[.todo] = [.calendar] } else if t == "search" { searchOpen = true } else if let first = AppTab(rawValue: t) { tab = first }
@@ -608,6 +610,7 @@ final class Engine: ObservableObject, ShellListener {
     }
 
     func changed() {
+        ReadAhead.shared.forget() // (build 70: what was read ahead is stale now — read again, unseen, after the screens showing)
         dataVersion += 1
         Task { await refreshSnapshot() }
         Task { await Reminders.shared.reschedule(self) } // (a tick, a hand-in: its reminders go)
@@ -657,9 +660,18 @@ final class Engine: ObservableObject, ShellListener {
     /// the bar at the very top running while it comes.
     /// `keepAs`: the arguments it is kept under, where they are not the ones asked with (a read forced afresh is kept
     /// as the plain read the screen asks for next time).
+    /// (build 70) A screen's read never runs while reading ahead is under way only for itself: reading ahead waits for a
+    /// quiet moment after it (ReadAhead). And an answer read ahead in the last minute is fresh already: its screen reads it
+    /// again without the bar (nothing is loading that the student is waiting for).
     func fetch<T: Decodable>(_ name: String, _ args: [String: Any] = [:], as type: T.Type, keepAs: [String: Any]? = nil) async throws -> T {
-        status.began()
-        defer { status.ended() }
+        let key = SavedAnswers.key(name, keepAs ?? args)
+        let quiet = ReadAhead.shared.fresh(key, within: 60)
+        ReadAhead.shared.screenBegan()
+        if !quiet { status.began() }
+        defer {
+            if !quiet { status.ended() }
+            ReadAhead.shared.screenEnded(key)
+        }
         return try await call(name, args, as: type, keep: true, keepAs: keepAs)
     }
 
@@ -1166,4 +1178,131 @@ struct EngineHost: UIViewRepresentable {
 
     func makeUIView(context: Context) -> SlotView { engine.hostView }
     func updateUIView(_ uiView: SlotView, context: Context) {}
+}
+
+
+// MARK: - Reading ahead (build 70)
+
+extension Engine {
+    /// (build 70) Whether the app may read ahead now: signed in with its screens on and the page ready, in the
+    /// foreground, not taking a quiz, the sign-in not under way, not in Low Power Mode, and not the simulator suite's
+    /// pictures (each waits for the page's answers to settle).
+    var mayReadAhead: Bool {
+        ready && web.shellOn && !focus && status.link == .on
+            && UIApplication.shared.applicationState == .active
+            && !ProcessInfo.processInfo.isLowPowerModeEnabled
+            && !UserDefaults.standard.bool(forKey: "SimplShotSettle")
+    }
+}
+
+/// (iPhone 1.9, build 70) Reading ahead: while the student is on one screen (a course's page, an assignment, anything),
+/// the time is used to read the others — Today, To Do, the courses, Grades, the calendar as it was last shown,
+/// Notifications, the Inbox, then each course's home and grades — so each opens on what Canvas says now, at once. One
+/// read at a time, only after a screen's own reads have been quiet for three seconds, a moment between each; each read
+/// again once it is five to fifteen minutes old (and all of them after something changes: a tick, a hand-in, Refresh).
+/// None of it shows: the bar at the top is for what the student is waiting on, and nothing here is (Engine.fetch).
+/// What it reads is kept as the screen's own read is (SavedAnswers), under the screen's own key; each asks the page for
+/// Canvas's answers no older than its own age (`maxAge`), so a read ahead is a fresh one, not the page's last.
+@MainActor
+final class ReadAhead {
+    static let shared = ReadAhead()
+
+    private struct Read {
+        let name: String
+        let args: [String: Any]
+        /// How old it may be before it is read again (seconds).
+        let every: TimeInterval
+    }
+
+    private weak var engine: Engine?
+    private var loop: Task<Void, Never>?
+    /// When each answer was last read (by its screen or ahead of it), by its key.
+    private var readAt: [String: Date] = [:]
+    private var screenReads = 0
+    private var lastScreenRead = Date.distantPast
+
+    func start(_ engine: Engine) {
+        self.engine = engine
+        guard loop == nil else { return }
+        loop = Task { [weak self] in await self?.run() }
+    }
+
+    /// A screen's own read beginning and ending (Engine.fetch).
+    func screenBegan() {
+        screenReads += 1
+        lastScreenRead = Date()
+    }
+
+    func screenEnded(_ key: String) {
+        screenReads = max(0, screenReads - 1)
+        lastScreenRead = Date()
+        readAt[key] = Date()
+    }
+
+    /// Whether an answer was read (ahead or by its screen) in the last `seconds`.
+    func fresh(_ key: String, within seconds: TimeInterval) -> Bool {
+        guard let at = readAt[key] else { return false }
+        return Date().timeIntervalSince(at) < seconds
+    }
+
+    /// Something changed: every answer is read again, in its turn.
+    func forget() { readAt = [:] }
+
+    private func run() async {
+        while !Task.isCancelled {
+            guard let engine else { return }
+            // (a screen reading, or only just done: the student's reads come first)
+            guard engine.mayReadAhead, screenReads == 0, Date().timeIntervalSince(lastScreenRead) >= 3 else {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                continue
+            }
+            guard let r = next(engine) else {
+                try? await Task.sleep(nanoseconds: 15_000_000_000) // (all of it fresh: looked at again in a while)
+                continue
+            }
+            let key = SavedAnswers.key(r.name, r.args)
+            readAt[key] = Date() // (marked first: a read that fails is not tried again at once)
+            var asked = r.args
+            asked["maxAge"] = r.every
+            _ = try? await engine.call(r.name, asked, as: AnyAnswer.self, keep: true, keepAs: r.args)
+            try? await Task.sleep(nanoseconds: 700_000_000)
+        }
+    }
+
+    /// The first read that is missing or old enough to read again.
+    private func next(_ engine: Engine) -> Read? {
+        let now = Date()
+        return reads(engine).first { r in
+            guard let at = readAt[SavedAnswers.key(r.name, r.args)] else { return true }
+            return now.timeIntervalSince(at) > r.every
+        }
+    }
+
+    /// What is read ahead, the screens most often opened first — under the arguments each screen asks with, so the
+    /// answer kept is the one it shows.
+    private func reads(_ engine: Engine) -> [Read] {
+        var list: [Read] = [
+            Read(name: "today", args: [:], every: 300),
+            Read(name: "todo", args: [:], every: 300),
+            Read(name: "courses", args: [:], every: 600),
+            Read(name: "grades", args: [:], every: 600),
+            Read(name: "calendar", args: CalendarView.readAheadArgs(), every: 600),
+            Read(name: "notifications", args: [:], every: 300),
+        ]
+        if !engine.onBrightspace { list.append(Read(name: "inbox", args: ["scope": "inbox"], every: 600)) }
+        list.append(Read(name: "coursesProgress", args: [:], every: 900))
+        // each course chosen: its home and its grades (the courses as last read)
+        if let courses = engine.saved("courses", as: CoursesData.self) {
+            for c in courses.rows.prefix(12) {
+                list.append(Read(name: "home", args: ["ctx": "courses/\(c.id)"], every: 900))
+                list.append(Read(name: "courseGrades", args: ["id": c.id], every: 900))
+            }
+        }
+        return list
+    }
+}
+
+/// An answer read only to be kept: whatever it holds.
+private struct AnyAnswer: Decodable {
+    init(from decoder: Decoder) throws {}
 }
