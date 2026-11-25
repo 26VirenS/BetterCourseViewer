@@ -52,6 +52,9 @@ final class Tour: ObservableObject {
     private weak var engine: Engine?
     private var window: TourWindow?
     private var frames: [Target: CGRect] = [:]
+    /// Views UIKit measures (TourProbe): a bar's button, whose SwiftUI frame is not the window's.
+    private var probes: [Target: Weak] = [:]
+    private struct Weak { weak var view: UIView? }
     private var courseIDs: [Int: String] = [:]
     /// How many courses the Courses list shows, once it has said.
     private var listCount: Int?
@@ -138,6 +141,19 @@ final class Tour: ObservableObject {
         guard TabBarProbe.usable(r) else { return }
         frames[t] = r
         if case .course(let i) = t, let id { courseIDs[i] = id }
+    }
+
+    /// A view of the bar's own, for its place in the window when the tour asks (TourProbe).
+    func probe(_ t: Target, _ v: UIView) { probes[t] = Weak(view: v) }
+
+    /// Where a probed view is in the window now, if it is on screen.
+    private func probed(_ t: Target) -> CGRect? {
+        guard let v = probes[t]?.view, TourFinder.shown(v) else { return nil }
+        let f = v.convert(v.bounds, to: nil)
+        guard TabBarProbe.usable(f), f.width > 4, f.height > 4 else { return nil }
+        // (the glass round a bar's icon: 44 points at least)
+        let w = max(44, f.width + 12), h = max(44, f.height + 8)
+        return CGRect(x: f.midX - w / 2, y: f.midY - h / 2, width: w, height: h)
     }
 
     /// The Courses list drawn: how many courses it shows.
@@ -310,8 +326,7 @@ final class Tour: ObservableObject {
             return (ring: r, hole: f.insetBy(dx: -8, dy: -8), radius: radius)
         case .switchCourse:
             guard let edge = engine.splitEdge[.courses] else { return nil }
-            let found = TourFinder.named("Switch course", leftOf: edge, in: app, log: dump("switch"))
-                ?? TourFinder.trailingButton(leftOf: edge, in: app, log: false)
+            let found = probed(.switcher) ?? TourFinder.named("Switch course", leftOf: edge, in: app, log: dump("switch"))
             guard let f = found else { return nil }
             // (the menu it opens comes down under it: the whole left column takes a press)
             let column = CGRect(x: 0, y: 0, width: edge, height: app.bounds.height)
@@ -882,15 +897,6 @@ enum TourFinder {
         guard let first = bars.first, let last = buttons(in: first.0, window: window).last, last.midX > first.1.midX else { return nil }
         return last
     }
-
-    /// The trailing button of the bar over the left column (Courses in two columns: Switch Course).
-    static func trailingButton(leftOf edge: CGFloat, in window: UIWindow, log: Bool) -> CGRect? {
-        guard let root = window.rootViewController?.view else { return nil }
-        let bars = navBars(in: root, window: window).filter { $0.1.maxX <= edge + 2 }
-        if log { bars.forEach { write("left bar", $0.0, in: window) } }
-        guard let first = bars.first, let last = buttons(in: first.0, window: window).last, last.midX > first.1.midX else { return nil }
-        return last
-    }
 }
 
 extension View {
@@ -909,4 +915,20 @@ struct TourCell: View {
     var body: some View {
         Color(.secondarySystemGroupedBackground).tourTarget(.course(index), id: id)
     }
+}
+
+/// (Build 72) A view's place for the tour measured by UIKit where it is drawn: a bar's button is drawn in a view of its
+/// own, where SwiftUI's own frame is not the window's (Switch Course).
+struct TourProbe: UIViewRepresentable {
+    let target: Tour.Target
+
+    func makeUIView(context: Context) -> UIView {
+        let v = UIView()
+        v.isUserInteractionEnabled = false
+        v.backgroundColor = .clear
+        Tour.shared.probe(target, v)
+        return v
+    }
+
+    func updateUIView(_ v: UIView, context: Context) { Tour.shared.probe(target, v) }
 }

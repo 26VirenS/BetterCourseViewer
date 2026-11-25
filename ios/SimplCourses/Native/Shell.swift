@@ -450,7 +450,7 @@ struct CourseSwitcher: View {
             Label("Switch Course", systemImage: "books.vertical")
         }
         .accessibilityLabel("Switch course")
-        .tourTarget(.switcher) // (build 72: the tour's ring, in two columns)
+        .background(TourProbe(target: .switcher).allowsHitTesting(false)) // (build 72: the tour's ring, in two columns)
         .task(id: engine.dataVersion) {
             if rows.isEmpty, let d = engine.saved("courses", as: CoursesData.self) { rows = d.rows } // (1.9: at once)
             if let d = try? await engine.call("courses", as: CoursesData.self, keep: true) { rows = d.rows }
