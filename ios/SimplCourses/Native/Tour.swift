@@ -148,8 +148,10 @@ final class Tour: ObservableObject {
 
     /// Where a probed view is in the window now, if it is on screen.
     private func probed(_ t: Target) -> CGRect? {
-        guard let v = probes[t]?.view, TourFinder.shown(v) else { return nil }
+        guard let v = probes[t]?.view, v.window != nil else { return nil }
         let f = v.convert(v.bounds, to: nil)
+        if writeOut { say("probe \(t): \(f) shown \(TourFinder.shown(v)) in \(String(describing: type(of: v.window!)))") }
+        guard v.window === appWindow, f.minX >= 0, f.minY >= 0 else { return nil }
         guard TabBarProbe.usable(f), f.width > 4, f.height > 4 else { return nil }
         // (the glass round a bar's icon: 44 points at least)
         let w = max(44, f.width + 12), h = max(44, f.height + 8)
@@ -327,6 +329,7 @@ final class Tour: ObservableObject {
         case .switchCourse:
             guard let edge = engine.splitEdge[.courses] else { return nil }
             let found = probed(.switcher) ?? TourFinder.named("Switch course", leftOf: edge, in: app, log: dump("switch"))
+                ?? TourFinder.firstOfGroup(leftOf: edge, in: app)
             guard let f = found else { return nil }
             // (the menu it opens comes down under it: the whole left column takes a press)
             let column = CGRect(x: 0, y: 0, width: edge, height: app.bounds.height)
@@ -885,6 +888,29 @@ enum TourFinder {
             }
         }
         return nil
+    }
+
+    /// The first button of the trailing group of the bar over the left column (iOS 26 draws a bar's buttons as one glass
+    /// group: Switch Course is first in it, the sidebar's button last) — its share of the group's width.
+    static func firstOfGroup(leftOf edge: CGFloat, in window: UIWindow) -> CGRect? {
+        guard let root = window.rootViewController?.view,
+              let left = navBars(in: root, window: window).first(where: { $0.1.maxX <= edge + 2 }) else { return nil }
+        let (bar, f) = left
+        var groups: [CGRect] = []
+        func walk(_ v: UIView) {
+            for s in v.subviews where !s.isHidden && s.alpha > 0.01 {
+                if name(s).contains("Platter") && !name(s).contains("Container") {
+                    let g = s.convert(s.bounds, to: window)
+                    if TabBarProbe.usable(g), g.height >= 34, g.height <= 56, g.width >= 40, g.midX > f.midX { groups.append(g) }
+                    continue
+                }
+                walk(s)
+            }
+        }
+        walk(bar)
+        guard let group = groups.max(by: { $0.width < $1.width }) else { return nil }
+        let n = max(1, (group.width / 56).rounded())
+        return CGRect(x: group.minX, y: group.minY, width: group.width / n, height: group.height)
     }
 
     /// The trailing button of the sheet up over the app (its Done).

@@ -448,9 +448,9 @@ struct CourseSwitcher: View {
             .pickerStyle(.inline)
         } label: {
             Label("Switch Course", systemImage: "books.vertical")
+                .background(TourProbe(target: .switcher).allowsHitTesting(false)) // (build 72: the tour's ring, in two columns)
         }
         .accessibilityLabel("Switch course")
-        .background(TourProbe(target: .switcher).allowsHitTesting(false)) // (build 72: the tour's ring, in two columns)
         .task(id: engine.dataVersion) {
             if rows.isEmpty, let d = engine.saved("courses", as: CoursesData.self) { rows = d.rows } // (1.9: at once)
             if let d = try? await engine.call("courses", as: CoursesData.self, keep: true) { rows = d.rows }
