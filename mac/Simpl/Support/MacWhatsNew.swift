@@ -14,6 +14,10 @@ import Foundation
 /// both unless developer mode is on; a version with nothing else is left out whole.
 enum MacWhatsNew {
     static let releases: [Release] = [
+        Release(version: "1.3.224", date: "2026-11-25", notes: [
+            ReleaseNote(kind: "fixed", title: "Square Dashboard Tiles", body: "The Dashboard's counters stay square in a narrow window, their names and numbers lined up."),
+            ReleaseNote(kind: "fixed", title: "Rubric Levels Stay Open", body: "Opening a rubric level's whole words no longer closes the app."),
+        ]),
         Release(version: "1.3.223", date: "2026-11-24", notes: [
             ReleaseNote(kind: "fixed", title: "Whole Rubric Levels", body: "Click More on a rubric level to read all of what it asks."),
         ]),
