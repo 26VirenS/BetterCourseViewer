@@ -1,0 +1,26 @@
+2026-11-25 00:44:18.767 Simpl[24283:68520] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-25 00:44:21.729 Simpl[24283:68520] [Simpl] window: the app's screens (no page)
+2026-11-25 00:44:22.398 Simpl[24283:68520] [Simpl] appear Dashboard: 950 ms
+2026-11-25 00:44:22.837 Simpl[24283:68520] [Simpl] appear Dashboard: 1389 ms
+2026-11-25 00:44:27.262 Simpl[24283:68520] [Simpl] open Dashboard: 5815 ms (kept)
+2026-11-25 00:44:27.842 Simpl[24283:68520] [Simpl] call quietColors: 5446 ms
+2026-11-25 00:44:27.847 Simpl[24283:68520] [Simpl] call dashList: 2821 ms
+2026-11-25 00:44:27.847 Simpl[24283:68520] [Simpl] call dashList: 2823 ms
+2026-11-25 00:44:27.875 Simpl[24283:68520] [Simpl] call today: 2677 ms
+2026-11-25 00:44:27.879 Simpl[24283:68520] [Simpl] call today: 2680 ms
+2026-11-25 00:44:28.480 Simpl[24283:68520] [Simpl] open Dashboard: 7032 ms (live)
+2026-11-25 00:44:28.609 Simpl[24283:68520] [Simpl] call snapshot: 1071 ms
+2026-11-25 00:44:29.114 Simpl[24283:68520] [Simpl] call todayCounts: 1874 ms
+2026-11-25 00:44:29.114 Simpl[24283:68520] [Simpl] call todayCounts: 1878 ms
+2026-11-25 00:44:29.115 Simpl[24283:68520] [Simpl] call dashSkyline: 4089 ms
+2026-11-25 00:44:29.115 Simpl[24283:68520] [Simpl] call assignment: 1577 ms
+2026-11-25 00:44:29.115 Simpl[24283:68520] [Simpl] macmillan popup: opened from the assignment (its tool on lmslink.bfwpub.com)
+2026-11-25 00:44:29.462 Simpl[24283:68520] [Simpl] call todayCounts: 2225 ms
+2026-11-25 00:44:29.462 Simpl[24283:68520] [Simpl] call todayCounts: 2222 ms
+2026-11-25 00:44:29.462 Simpl[24283:68520] [Simpl] call dashSkyline: 4438 ms
+2026-11-25 00:44:29.803 Simpl[24283:68520] [Simpl] popup look: 984 × 591, 20 in from the window (sidebar out)
+2026-11-25 00:44:30.315 Simpl[24283:68520] [Simpl] call toolLaunch: 169 ms
+2026-11-25 00:44:30.316 Simpl[24283:68520] [Simpl] macmillan popup: opened
+2026-11-25 00:44:31.527 Simpl[24283:68520] [Simpl] call courses: 2413 ms
+2026-11-25 00:44:31.842 Simpl[24283:68520] [Simpl] call groups: 313 ms
+2026-11-25 00:44:33.364 Simpl[24283:68520] [Simpl] call moreFromCanvas: 1522 ms

@@ -1,0 +1,11 @@
+2026-11-25 00:38:24.318 Simpl[8263:26293] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-25 00:38:25.516 Simpl[8263:26293] [Simpl] window: the app's screens (no page)
+2026-11-25 00:38:30.235 Simpl[8263:26293] [Simpl] popup tool: 984 × 611, 20 in from the window (sidebar out)
+2026-11-25 00:38:36.094 Simpl[8263:26293] [Simpl] bio launch: cell plant:select=chloroplast on the plant page: scale teaching, cutaway on, explode 0.00, selected organelle:chloroplast, quiz none
+2026-11-25 00:38:54.512 Simpl[8263:26293] [Simpl] popup tool: 984 × 588, 20 in from the window (sidebar out)
+2026-11-25 00:38:56.685 Simpl[8263:26293] [Simpl] call snapshot: 270 ms
+2026-11-25 00:38:57.145 Simpl[8263:26293] [Simpl] call courses: 379 ms
+2026-11-25 00:38:57.360 Simpl[8263:26293] [Simpl] call groups: 214 ms
+2026-11-25 00:38:58.207 Simpl[8263:26293] [Simpl] call moreFromCanvas: 847 ms
+2026-11-25 00:38:58.996 Simpl[8263:26293] [Simpl] bio scene: plant|false|true|false|0.0|amyloplast|-|false|true|- made in 24743 ms, 645 objects
+2026-11-25 00:38:59.190 Simpl[8263:26293] [Simpl] bio frame plant|false|true|false|0.0|amyloplast|-|false|true|-: view 570 × 357, model 51% across, 75% up

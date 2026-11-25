@@ -1,0 +1,28 @@
+2026-11-25 00:49:56.944 Simpl[39562:106581] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-25 00:50:01.640 Simpl[39562:106581] [Simpl] window: the app's screens (no page)
+2026-11-25 00:50:02.414 Simpl[39562:106581] [Simpl] appear Dashboard: 1131 ms
+2026-11-25 00:50:03.070 Simpl[39562:106581] [Simpl] appear Dashboard: 1787 ms
+2026-11-25 00:50:08.082 Simpl[39562:106581] [Simpl] open Dashboard: 6799 ms (kept)
+2026-11-25 00:50:09.250 Simpl[39562:106581] [Simpl] appear Course grades: 7966 ms
+2026-11-25 00:50:09.370 Simpl[39562:106581] [Simpl] appear Course grades: 8087 ms
+2026-11-25 00:50:12.948 Simpl[39562:106581] [Simpl] call quietColors: 3701 ms
+2026-11-25 00:50:12.993 Simpl[39562:106581] [Simpl] call quietColors: 10608 ms
+2026-11-25 00:50:12.998 Simpl[39562:106581] [Simpl] call today: 7491 ms
+2026-11-25 00:50:12.999 Simpl[39562:106581] [Simpl] call today: 7492 ms
+2026-11-25 00:50:13.000 Simpl[39562:106581] [Simpl] call dashList: 7565 ms
+2026-11-25 00:50:13.000 Simpl[39562:106581] [Simpl] call todayCounts: 4935 ms
+2026-11-25 00:50:13.001 Simpl[39562:106581] [Simpl] call todayCounts: 4935 ms
+2026-11-25 00:50:13.001 Simpl[39562:106581] [Simpl] call todayCounts: 4936 ms
+2026-11-25 00:50:13.008 Simpl[39562:106581] [Simpl] call dashList: 7572 ms
+2026-11-25 00:50:13.008 Simpl[39562:106581] [Simpl] call todayCounts: 4943 ms
+2026-11-25 00:50:13.011 Simpl[39562:106581] [Simpl] call dashSkyline: 7576 ms
+2026-11-25 00:50:13.013 Simpl[39562:106581] [Simpl] call dashSkyline: 7578 ms
+2026-11-25 00:50:13.029 Simpl[39562:106581] [Simpl] call snapshot: 4398 ms
+2026-11-25 00:50:14.174 Simpl[39562:106581] [Simpl] call courseGrades: 4803 ms
+2026-11-25 00:50:14.176 Simpl[39562:106581] [Simpl] call courseGrades: 4921 ms
+2026-11-25 00:50:14.179 Simpl[39562:106581] [Simpl] open Dashboard: 12896 ms (live)
+2026-11-25 00:50:16.416 Simpl[39562:106581] [Simpl] open Course grades: 15133 ms (fetched)
+2026-11-25 00:50:16.418 Simpl[39562:106581] [Simpl] call courses: 2902 ms
+2026-11-25 00:50:20.593 Simpl[39562:106581] [Simpl] call groups: 4175 ms
+2026-11-25 00:50:21.259 Simpl[39562:106581] [Simpl] call moreFromCanvas: 665 ms
+2026-11-25 00:50:24.492 Simpl[39562:106581] [Simpl] shot: another copy of the app is in front; brought forward again

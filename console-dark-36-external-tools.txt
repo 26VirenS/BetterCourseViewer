@@ -1,0 +1,15 @@
+2026-11-25 00:45:50.392 Simpl[28467:79169] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-25 00:45:54.018 Simpl[28467:79169] [Simpl] window: the app's screens (no page)
+2026-11-25 00:45:54.873 Simpl[28467:79169] [Simpl] appear External Tools: 1169 ms
+2026-11-25 00:45:55.416 Simpl[28467:79169] [Simpl] appear External Tools: 1711 ms
+2026-11-25 00:46:02.513 Simpl[28467:79169] [Simpl] call quietColors: 7640 ms
+2026-11-25 00:46:02.623 Simpl[28467:79169] [Simpl] call snapshot: 330 ms
+2026-11-25 00:46:03.043 Simpl[28467:79169] [Simpl] call externalTools: 8169 ms
+2026-11-25 00:46:03.043 Simpl[28467:79169] [Simpl] call externalTools: 7627 ms
+2026-11-25 00:46:03.267 Simpl[28467:79169] [Simpl] open External Tools: 9563 ms (fetched)
+2026-11-25 00:46:03.283 Simpl[28467:79169] [Simpl] call courses: 480 ms
+2026-11-25 00:46:03.419 Simpl[28467:79169] [Simpl] call groups: 135 ms
+2026-11-25 00:46:03.520 Simpl[28467:79169] [Simpl] tool logo: tool.example.com none
+2026-11-25 00:46:04.061 Simpl[28467:79169] [Simpl] call moreFromCanvas: 641 ms
+2026-11-25 00:46:04.471 Simpl[28467:79169] [Simpl] tool logo: lmslink.bfwpub.com glyph
+2026-11-25 00:46:06.515 Simpl[28467:79169] [Simpl] tool logo: session.masteringphysics.com glyph

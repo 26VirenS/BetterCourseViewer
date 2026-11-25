@@ -1,0 +1,25 @@
+2026-11-25 00:38:34.410 Simpl[11482:36586] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-25 00:38:35.524 Simpl[11482:36586] [Simpl] window: the app's screens (no page)
+2026-11-25 00:38:35.944 Simpl[11482:36586] [Simpl] appear Dashboard: 573 ms
+2026-11-25 00:38:36.183 Simpl[11482:36586] [Simpl] appear Dashboard: 811 ms
+2026-11-25 00:38:40.315 Simpl[11482:36586] [Simpl] open Dashboard: 4846 ms (kept)
+2026-11-25 00:38:40.675 Simpl[11482:36586] [Simpl] call quietColors: 4731 ms
+2026-11-25 00:38:40.706 Simpl[11482:36586] [Simpl] call dashList: 3571 ms
+2026-11-25 00:38:40.707 Simpl[11482:36586] [Simpl] call dashList: 3573 ms
+2026-11-25 00:38:40.779 Simpl[11482:36586] [Simpl] call today: 3264 ms
+2026-11-25 00:38:40.780 Simpl[11482:36586] [Simpl] call today: 3266 ms
+2026-11-25 00:38:40.781 Simpl[11482:36586] [Simpl] call todayCounts: 600 ms
+2026-11-25 00:38:40.965 Simpl[11482:36586] [Simpl] call snapshot: 386 ms
+2026-11-25 00:38:41.268 Simpl[11482:36586] [Simpl] call todayCounts: 1088 ms
+2026-11-25 00:38:41.272 Simpl[11482:36586] [Simpl] counter: today fades in (Reduce Motion)
+2026-11-25 00:38:41.275 Simpl[11482:36586] [Simpl] open Dashboard: 5904 ms (live)
+2026-11-25 00:38:42.040 Simpl[11482:36586] [Simpl] counter: today fades in (Reduce Motion)
+2026-11-25 00:38:42.274 Simpl[11482:36586] [Simpl] call todayCounts: 2093 ms
+2026-11-25 00:38:42.274 Simpl[11482:36586] [Simpl] call todayCounts: 2094 ms
+2026-11-25 00:38:42.274 Simpl[11482:36586] [Simpl] call dashSkyline: 5139 ms
+2026-11-25 00:38:42.274 Simpl[11482:36586] [Simpl] call dashSkyline: 5141 ms
+2026-11-25 00:38:42.344 Simpl[11482:36586] [Simpl] call courses: 1077 ms
+2026-11-25 00:38:42.756 Simpl[11482:36586] [Simpl] call todaySheet: 634 ms
+2026-11-25 00:38:43.568 Simpl[11482:36586] [Simpl] call groups: 1224 ms
+2026-11-25 00:38:44.203 Simpl[11482:36586] [Simpl] call moreFromCanvas: 634 ms
+2026-11-25 00:38:44.617 Simpl[11482:36586] [Simpl] call assignment: 217 ms

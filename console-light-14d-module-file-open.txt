@@ -1,0 +1,17 @@
+2026-11-25 00:52:44.588 Simpl[46434:123507] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-25 00:52:47.940 Simpl[46434:123507] [Simpl] window: the app's screens (no page)
+2026-11-25 00:52:48.718 Simpl[46434:123507] [Simpl] appear Section Modules: 1151 ms
+2026-11-25 00:52:49.745 Simpl[46434:123507] [Simpl] appear Section Modules: 2178 ms
+2026-11-25 00:52:54.053 Simpl[46434:123507] [Simpl] call quietColors: 5330 ms
+2026-11-25 00:52:54.132 Simpl[46434:123507] [Simpl] call snapshot: 233 ms
+2026-11-25 00:52:56.477 Simpl[46434:123507] [Simpl] call modules: 6729 ms
+2026-11-25 00:52:56.480 Simpl[46434:123507] [Simpl] call modules: 3847 ms
+2026-11-25 00:52:56.491 Simpl[46434:123507] [Simpl] call home: 3970 ms
+2026-11-25 00:52:57.618 Simpl[46434:123507] [Simpl] open Section Modules: 10051 ms (fetched)
+2026-11-25 00:52:58.216 Simpl[46434:123507] [Simpl] call courses: 3499 ms
+2026-11-25 00:52:58.218 Simpl[46434:123507] [Simpl] call fileInfo: 599 ms
+2026-11-25 00:52:58.932 Simpl[46434:123507] SimplPreview: download.pdf in PDFKit (1 pages)
+2026-11-25 00:52:59.717 Simpl[46434:123507] [files] Preview: 1 item, download.pdf (Simpl's preview window, not downloaded)
+2026-11-25 00:52:59.858 Simpl[46434:123507] [Simpl] call groups: 1640 ms
+IOServiceMatchingfailed for: AppleM2ScalerParavirtDriver
+2026-11-25 00:53:01.041 Simpl[46434:123507] [Simpl] call moreFromCanvas: 1182 ms

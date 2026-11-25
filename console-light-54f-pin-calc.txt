@@ -1,0 +1,25 @@
+2026-11-25 00:46:10.089 Simpl[25664:71999] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-25 00:46:13.201 Simpl[25664:71999] [Simpl] window: the app's screens (no page)
+2026-11-25 00:46:13.826 Simpl[25664:71999] [Simpl] appear Dashboard: 1391 ms
+2026-11-25 00:46:14.316 Simpl[25664:71999] [Simpl] appear Dashboard: 1881 ms
+2026-11-25 00:46:28.781 Simpl[25664:71999] [Simpl] open Dashboard: 16346 ms (kept)
+2026-11-25 00:46:30.111 Simpl[25664:71999] [Simpl] calculator: its page loaded
+2026-11-25 00:46:32.123 Simpl[25664:71999] [Simpl] call quietColors: 18297 ms
+2026-11-25 00:46:32.295 Simpl[25664:71999] [Simpl] call dashList: 13183 ms
+2026-11-25 00:46:32.313 Simpl[25664:71999] [Simpl] call dashList: 13164 ms
+2026-11-25 00:46:32.315 Simpl[25664:71999] [Simpl] call today: 10127 ms
+2026-11-25 00:46:32.413 Simpl[25664:71999] [Simpl] call today: 10226 ms
+2026-11-25 00:46:32.414 Simpl[25664:71999] [Simpl] call todayCounts: 3677 ms
+2026-11-25 00:46:32.414 Simpl[25664:71999] [Simpl] call todayCounts: 3677 ms
+2026-11-25 00:46:32.415 Simpl[25664:71999] [Simpl] call todayCounts: 3678 ms
+2026-11-25 00:46:32.449 Simpl[25664:71999] [Simpl] call dashSkyline: 13266 ms
+2026-11-25 00:46:32.454 Simpl[25664:71999] [Simpl] call dashSkyline: 13372 ms
+2026-11-25 00:46:32.454 Simpl[25664:71999] [Simpl] call todayCounts: 3717 ms
+2026-11-25 00:46:33.233 Simpl[25664:71999] [Simpl] call snapshot: 3307 ms
+2026-11-25 00:46:35.576 Simpl[25664:71999] [Simpl] open Dashboard: 23141 ms (live)
+2026-11-25 00:46:50.265 Simpl[25664:71999] [Simpl] calculator: its page loaded
+2026-11-25 00:46:50.270 Simpl[25664:71999] [Simpl] call courses: 14711 ms
+2026-11-25 00:46:50.809 Simpl[25664:71999] [Simpl] call groups: 538 ms
+2026-11-25 00:46:52.013 Simpl[25664:71999] [Simpl] call moreFromCanvas: 1203 ms
+2026-11-25 00:46:59.732 Simpl[25664:71999] [Simpl] calculator: GeoGebra is ready
+2026-11-25 00:47:15.366 Simpl[25664:71999] [Simpl] live: dashboard waits (inactive)

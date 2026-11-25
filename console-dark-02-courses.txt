@@ -1,0 +1,14 @@
+2026-11-25 00:36:51.383 Simpl[5421:19219] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-25 00:36:52.829 Simpl[5421:19219] [Simpl] window: the app's screens (no page)
+2026-11-25 00:36:53.158 Simpl[5421:19219] [Simpl] appear Courses: 693 ms
+2026-11-25 00:36:53.667 Simpl[5421:19219] [Simpl] appear Courses: 1202 ms
+2026-11-25 00:36:56.743 Simpl[5421:19219] [Simpl] call quietColors: 3585 ms
+2026-11-25 00:36:56.745 Simpl[5421:19219] [Simpl] call allCourses: 862 ms
+2026-11-25 00:36:56.746 Simpl[5421:19219] [Simpl] call snapshot: 112 ms
+2026-11-25 00:36:57.102 Simpl[5421:19219] [Simpl] call allCourses: 1219 ms
+2026-11-25 00:36:58.935 Simpl[5421:19219] [Simpl] open Courses: 6470 ms (fetched)
+2026-11-25 00:36:58.964 Simpl[5421:19219] [Simpl] call courses: 1889 ms
+2026-11-25 00:36:59.385 Simpl[5421:19219] [Simpl] call coursesProgress: 2639 ms
+2026-11-25 00:36:59.385 Simpl[5421:19219] [Simpl] call coursesProgress: 2228 ms
+2026-11-25 00:36:59.475 Simpl[5421:19219] [Simpl] call groups: 510 ms
+2026-11-25 00:36:59.967 Simpl[5421:19219] [Simpl] call moreFromCanvas: 491 ms

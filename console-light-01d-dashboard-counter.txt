@@ -1,0 +1,25 @@
+2026-11-25 00:36:39.095 Simpl[4081:15457] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-25 00:36:40.814 Simpl[4081:15457] [Simpl] window: the app's screens (no page)
+2026-11-25 00:36:41.508 Simpl[4081:15457] [Simpl] appear Dashboard: 940 ms
+2026-11-25 00:36:41.986 Simpl[4081:15457] [Simpl] appear Dashboard: 1417 ms
+2026-11-25 00:36:45.672 Simpl[4081:15457] [Simpl] open Dashboard: 5100 ms (kept)
+2026-11-25 00:36:46.434 Simpl[4081:15457] [Simpl] call quietColors: 4912 ms
+2026-11-25 00:36:46.435 Simpl[4081:15457] [Simpl] call dashList: 2580 ms
+2026-11-25 00:36:46.437 Simpl[4081:15457] [Simpl] call dashList: 2582 ms
+2026-11-25 00:36:46.447 Simpl[4081:15457] [Simpl] call today: 2478 ms
+2026-11-25 00:36:46.449 Simpl[4081:15457] [Simpl] call dashSkyline: 2594 ms
+2026-11-25 00:36:46.453 Simpl[4081:15457] [Simpl] call dashSkyline: 2598 ms
+2026-11-25 00:36:46.453 Simpl[4081:15457] [Simpl] call today: 2485 ms
+2026-11-25 00:36:46.453 Simpl[4081:15457] [Simpl] call todayCounts: 797 ms
+2026-11-25 00:36:46.454 Simpl[4081:15457] [Simpl] call todayCounts: 797 ms
+2026-11-25 00:36:46.454 Simpl[4081:15457] [Simpl] call todayCounts: 798 ms
+2026-11-25 00:36:46.454 Simpl[4081:15457] [Simpl] call todayCounts: 798 ms
+2026-11-25 00:36:46.454 Simpl[4081:15457] [Simpl] call snapshot: 484 ms
+2026-11-25 00:36:46.919 Simpl[4081:15457] [Simpl] counter: next fades in (Reduce Motion)
+2026-11-25 00:36:46.921 Simpl[4081:15457] [Simpl] open Dashboard: 6349 ms (live)
+2026-11-25 00:36:46.991 Simpl[4081:15457] [Simpl] call courses: 390 ms
+2026-11-25 00:36:47.119 Simpl[4081:15457] [Simpl] counter: next fades in (Reduce Motion)
+2026-11-25 00:36:47.255 Simpl[4081:15457] [Simpl] call groups: 263 ms
+2026-11-25 00:36:49.218 Simpl[4081:15457] [Simpl] call todaySheet: 2030 ms
+2026-11-25 00:36:51.539 Simpl[4081:15457] [Simpl] call moreFromCanvas: 4281 ms
+2026-11-25 00:36:54.349 Simpl[4081:15457] NSQuitAlwaysKeepsWindows=NO

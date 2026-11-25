@@ -1,0 +1,28 @@
+2026-11-25 00:58:00.585 Simpl[52094:138842] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-25 00:58:02.857 Simpl[52094:138842] [Simpl] window: the app's screens (/)
+2026-11-25 00:58:02.993 Simpl[52094:138842] [Simpl] appear Dashboard: 2022 ms
+2026-11-25 00:58:03.030 Simpl[52094:138842] [Simpl] appear Dashboard: 2058 ms
+2026-11-25 00:58:03.441 Simpl[52094:138842] [Simpl] call quietColors: 448 ms
+2026-11-25 00:58:03.487 Simpl[52094:138842] [Simpl] call dashSkyline: 148 ms
+2026-11-25 00:58:03.487 Simpl[52094:138842] [Simpl] call dashSkyline: 489 ms
+2026-11-25 00:58:03.515 Simpl[52094:138842] [Simpl] call dashList: 517 ms
+2026-11-25 00:58:03.515 Simpl[52094:138842] [Simpl] call dashList: 177 ms
+2026-11-25 00:58:03.642 Simpl[52094:138842] [Simpl] call snapshot: 644 ms
+2026-11-25 00:58:03.676 Simpl[52094:138842] [Simpl] call today: 677 ms
+2026-11-25 00:58:03.676 Simpl[52094:138842] [Simpl] call today: 337 ms
+2026-11-25 00:58:04.309 Simpl[52094:138842] [Simpl] open Dashboard: 3337 ms (fetched)
+2026-11-25 00:58:04.312 Simpl[52094:138842] [Simpl] call todayCounts: 972 ms
+2026-11-25 00:58:04.313 Simpl[52094:138842] [Simpl] call todayCounts: 972 ms
+2026-11-25 00:58:04.313 Simpl[52094:138842] [Simpl] call todayCounts: 972 ms
+2026-11-25 00:58:04.313 Simpl[52094:138842] [Simpl] call todayCounts: 972 ms
+2026-11-25 00:58:04.313 Simpl[52094:138842] [Simpl] call dashSkyline: 826 ms
+2026-11-25 00:58:04.313 Simpl[52094:138842] [Simpl] call dashSkyline: 826 ms
+2026-11-25 00:58:04.442 Simpl[52094:138842] [Simpl] call courses: 767 ms
+2026-11-25 00:58:04.692 Simpl[52094:138842] [Simpl] call groups: 249 ms
+2026-11-25 00:58:05.340 Simpl[52094:138842] [Simpl] call moreFromCanvas: 648 ms
+2026-11-25 00:58:07.660 Simpl[52094:138842] [Simpl] live: dashboard unchanged · 0 reads · 0 redraws
+2026-11-25 00:58:09.599 Simpl[52094:138842] [Simpl] live: dev change done made (assignment:1009)
+2026-11-25 00:58:11.723 Simpl[52094:138842] [Simpl] live: dashboard updated counters,day,greeting,list,sidebar · 15 reads · 2 redraws
+2026-11-25 00:58:15.818 Simpl[52094:138842] [Simpl] live: dashboard unchanged · 15 reads · 0 redraws
+2026-11-25 00:58:19.962 Simpl[52094:138842] [Simpl] live: dashboard unchanged · 15 reads · 0 redraws
+2026-11-25 00:58:23.899 Simpl[52094:138842] [Simpl] live: dashboard unchanged · 15 reads · 0 redraws

@@ -1,0 +1,24 @@
+2026-11-25 00:37:25.499 Simpl[6892:24020] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-25 00:37:28.799 Simpl[6892:24020] [Simpl] window: the app's screens (no page)
+2026-11-25 00:37:30.347 Simpl[6892:24020] [Simpl] appear Dashboard: 2072 ms
+2026-11-25 00:37:32.960 Simpl[6892:24020] [Simpl] appear Dashboard: 4685 ms
+2026-11-25 00:37:56.274 Simpl[6892:24020] [Simpl] open Dashboard: 27999 ms (kept)
+2026-11-25 00:38:01.027 Simpl[6892:24020] [Simpl] popup alta: 984 × 591, 20 in from the window (sidebar out)
+2026-11-25 00:38:03.033 Simpl[6892:24020] [Simpl] calculator: its page loaded
+2026-11-25 00:38:08.421 Simpl[6892:24020] [Simpl] calculator: GeoGebra is ready
+2026-11-25 00:38:08.633 Simpl[6892:24020] [Simpl] call dashList: 24075 ms
+2026-11-25 00:38:08.634 Simpl[6892:24020] [Simpl] call dashList: 24079 ms
+2026-11-25 00:38:08.635 Simpl[6892:24020] [Simpl] call dashSkyline: 24081 ms
+2026-11-25 00:38:11.182 Simpl[6892:24020] [Simpl] call toolLaunch: 5410 ms
+2026-11-25 00:38:11.245 Simpl[6892:24020] [Simpl] call dashSkyline: 26687 ms
+2026-11-25 00:38:11.246 Simpl[6892:24020] [Simpl] call today: 25757 ms
+2026-11-25 00:38:11.257 Simpl[6892:24020] [Simpl] call today: 25768 ms
+2026-11-25 00:38:11.259 Simpl[6892:24020] [Simpl] call todayCounts: 15082 ms
+2026-11-25 00:38:11.262 Simpl[6892:24020] [Simpl] call todayCounts: 15085 ms
+2026-11-25 00:38:11.262 Simpl[6892:24020] [Simpl] call todayCounts: 15086 ms
+2026-11-25 00:38:11.262 Simpl[6892:24020] [Simpl] call todayCounts: 15086 ms
+2026-11-25 00:38:12.086 Simpl[6892:24020] [Simpl] call snapshot: 11753 ms
+2026-11-25 00:38:13.448 Simpl[6892:24020] [Simpl] open Dashboard: 45173 ms (live)
+2026-11-25 00:38:31.227 Simpl[6892:24020] [Simpl] alta: view made 17 ms · asked 7400 ms · launch 12812 ms · page 32053 ms · overview 32258 ms · shown 32261 ms (overview, quiet 130 ms, 195 ms after DOMContentLoaded)
+2026-11-25 00:38:50.269 Simpl[6892:24020] [Simpl] live: dashboard waits (inactive)
+2026-11-25 00:38:51.483 Simpl[6892:24020] [Simpl] call courses: 38053 ms

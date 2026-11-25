@@ -1,0 +1,24 @@
+2026-11-25 00:44:28.897 Simpl[22414:62247] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-25 00:44:31.181 Simpl[22414:62247] [Simpl] window: the app's screens (no page)
+2026-11-25 00:44:32.124 Simpl[22414:62247] [Simpl] appear Dashboard: 1334 ms
+2026-11-25 00:44:33.249 Simpl[22414:62247] [Simpl] appear Dashboard: 2459 ms
+2026-11-25 00:44:39.499 Simpl[22414:62247] [Simpl] open Dashboard: 8706 ms (kept)
+2026-11-25 00:44:40.633 Simpl[22414:62247] [Simpl] call todayCounts: 1148 ms
+2026-11-25 00:44:40.634 Simpl[22414:62247] [Simpl] call todayCounts: 1152 ms
+2026-11-25 00:44:40.634 Simpl[22414:62247] [Simpl] call quietColors: 8539 ms
+2026-11-25 00:44:40.637 Simpl[22414:62247] [Simpl] call today: 3066 ms
+2026-11-25 00:44:40.639 Simpl[22414:62247] [Simpl] call todayCounts: 1155 ms
+2026-11-25 00:44:40.640 Simpl[22414:62247] [Simpl] call todayCounts: 1157 ms
+2026-11-25 00:44:40.857 Simpl[22414:62247] [Simpl] call today: 3286 ms
+2026-11-25 00:44:40.858 Simpl[22414:62247] [Simpl] call dashList: 3614 ms
+2026-11-25 00:44:40.858 Simpl[22414:62247] [Simpl] call dashList: 3617 ms
+2026-11-25 00:44:40.858 Simpl[22414:62247] [Simpl] counter: unread fades in (Reduce Motion)
+2026-11-25 00:44:40.858 Simpl[22414:62247] [Simpl] call snapshot: 897 ms
+2026-11-25 00:44:42.357 Simpl[22414:62247] [Simpl] open Dashboard: 11562 ms (live)
+2026-11-25 00:44:42.366 Simpl[22414:62247] [Simpl] counter: unread fades in (Reduce Motion)
+2026-11-25 00:44:46.348 Simpl[22414:62247] [Simpl] call dashSkyline: 9102 ms
+2026-11-25 00:44:46.349 Simpl[22414:62247] [Simpl] call dashSkyline: 9106 ms
+2026-11-25 00:44:46.378 Simpl[22414:62247] [Simpl] call courses: 5167 ms
+2026-11-25 00:44:48.276 Simpl[22414:62247] [Simpl] call todaySheet: 5479 ms
+2026-11-25 00:44:50.083 Simpl[22414:62247] [Simpl] call groups: 3702 ms
+2026-11-25 00:44:51.990 Simpl[22414:62247] [Simpl] call moreFromCanvas: 1902 ms

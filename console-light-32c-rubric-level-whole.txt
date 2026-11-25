@@ -1,0 +1,24 @@
+2026-11-25 00:54:44.825 Simpl[44297:119180] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-25 00:54:46.640 Simpl[44297:119180] [Simpl] window: the app's screens (no page)
+2026-11-25 00:54:47.154 Simpl[44297:119180] [Simpl] appear Course home: 716 ms
+2026-11-25 00:54:47.940 Simpl[44297:119180] [Simpl] appear Course home: 1500 ms
+2026-11-25 00:54:51.630 Simpl[44297:119180] [Simpl] appear Assignment: 299 ms
+2026-11-25 00:54:53.183 Simpl[44297:119180] [Simpl] call quietColors: 6017 ms
+2026-11-25 00:54:53.186 Simpl[44297:119180] [Simpl] call home: 2512 ms
+2026-11-25 00:54:53.187 Simpl[44297:119180] [Simpl] call home: 2568 ms
+2026-11-25 00:54:53.188 Simpl[44297:119180] [Simpl] call home: 2632 ms
+2026-11-25 00:54:54.298 Simpl[44297:119180] [Simpl] open Course home: 2931 ms (fetched)
+2026-11-25 00:54:54.324 Simpl[44297:119180] [Simpl] call assignment: 2632 ms
+2026-11-25 00:54:54.429 Simpl[44297:119180] [Simpl] popup rubric: 984 × 591, 20 in from the window (sidebar out)
+2026-11-25 00:54:54.959 Simpl[44297:119180] SimplAssignment 4001: files 1, comments 3, steps See Feedback+Hand In Again, review 0, handIn 0, error -
+2026-11-25 00:54:54.962 Simpl[44297:119180] [Simpl] call neighbours: 2894 ms
+2026-11-25 00:54:54.971 Simpl[44297:119180] [Simpl] call snapshot: 3640 ms
+2026-11-25 00:54:55.519 Simpl[44297:119180] SimplMore group=Assignments
+2026-11-25 00:54:57.412 Simpl[44297:119180] [Simpl] open Assignment: 6081 ms (fetched)
+2026-11-25 00:54:58.742 Simpl[44297:119180] [Simpl] call neighbours: 2781 ms
+2026-11-25 00:54:58.782 Simpl[44297:119180] [Simpl] call courses: 3122 ms
+2026-11-25 00:55:00.622 Simpl[44297:119180] [Simpl] popup rubric: 984 × 588, 20 in from the window (sidebar out)
+2026-11-25 00:55:00.791 Simpl[44297:119180] [Simpl] rubric: level 0 of criterion 0 opened
+2026-11-25 00:55:03.071 Simpl[44297:119180] [Simpl] popup rubric: 984 × 591, 20 in from the window (sidebar out)
+2026-11-25 00:55:03.141 Simpl[44297:119180] [Simpl] call groups: 4359 ms
+2026-11-25 00:55:03.999 Simpl[44297:119180] [Simpl] call moreFromCanvas: 857 ms

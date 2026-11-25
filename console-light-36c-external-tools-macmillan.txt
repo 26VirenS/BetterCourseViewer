@@ -1,0 +1,21 @@
+2026-11-25 00:51:01.945 Simpl[37537:100208] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-25 00:51:14.082 Simpl[37537:100208] [Simpl] window: the app's screens (no page)
+2026-11-25 00:51:15.224 Simpl[37537:100208] [Simpl] appear External Tools: 1883 ms
+2026-11-25 00:51:15.598 Simpl[37537:100208] [Simpl] appear External Tools: 2253 ms
+2026-11-25 00:51:26.547 Simpl[37537:100208] [Simpl] call quietColors: 11323 ms
+2026-11-25 00:51:26.570 Simpl[37537:100208] [Simpl] call snapshot: 424 ms
+2026-11-25 00:51:27.179 Simpl[37537:100208] [Simpl] call externalTools: 11954 ms
+2026-11-25 00:51:27.182 Simpl[37537:100208] [Simpl] tool list: opening Macmillan Learning
+2026-11-25 00:51:27.182 Simpl[37537:100208] [Simpl] call externalTools: 11584 ms
+2026-11-25 00:51:27.183 Simpl[37537:100208] [Simpl] tool list: opening Macmillan Learning
+2026-11-25 00:51:27.435 Simpl[37537:100208] [Simpl] tool list shown: Macmillan Learning
+2026-11-25 00:51:27.435 Simpl[37537:100208] [Simpl] tool list shown: Macmillan Learning
+2026-11-25 00:51:27.455 Simpl[37537:100208] [Simpl] tool list closed: Macmillan Learning
+2026-11-25 00:51:27.598 Simpl[37537:100208] [Simpl] open External Tools: 14256 ms (fetched)
+2026-11-25 00:51:28.353 Simpl[37537:100208] [Simpl] call courses: 1505 ms
+2026-11-25 00:51:28.387 Simpl[37537:100208] [Simpl] tool logo: tool.example.com none
+2026-11-25 00:51:28.393 Simpl[37537:100208] [Simpl] tool logo: lmslink.bfwpub.com glyph
+2026-11-25 00:51:28.681 Simpl[37537:100208] [Simpl] call groups: 327 ms
+2026-11-25 00:51:29.540 Simpl[37537:100208] [Simpl] call moreFromCanvas: 858 ms
+2026-11-25 00:51:32.242 Simpl[37537:100208] [Simpl] tool logo: session.masteringphysics.com glyph
+2026-11-25 00:51:34.812 Simpl[37537:100208] [Simpl] shot: another copy of the app is in front; brought forward again

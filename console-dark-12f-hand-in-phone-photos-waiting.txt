@@ -1,0 +1,24 @@
+2026-11-25 00:49:28.545 Simpl[38427:103777] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-25 00:49:30.418 Simpl[38427:103777] [Simpl] window: the app's screens (no page)
+2026-11-25 00:49:31.048 Simpl[38427:103777] [Simpl] appear Course home: 796 ms
+2026-11-25 00:49:31.533 Simpl[38427:103777] [Simpl] appear Course home: 1282 ms
+2026-11-25 00:49:35.170 Simpl[38427:103777] [Simpl] open Course home: 4920 ms (kept)
+2026-11-25 00:49:36.019 Simpl[38427:103777] [Simpl] appear Assignment: 481 ms
+2026-11-25 00:49:36.958 Simpl[38427:103777] [Simpl] call quietColors: 5911 ms
+2026-11-25 00:49:37.150 Simpl[38427:103777] [Simpl] call snapshot: 1611 ms
+2026-11-25 00:49:37.686 Simpl[38427:103777] [Simpl] call neighbours: 1556 ms
+2026-11-25 00:49:37.915 Simpl[38427:103777] [Simpl] call home: 3711 ms
+2026-11-25 00:49:37.915 Simpl[38427:103777] [Simpl] call home: 3713 ms
+2026-11-25 00:49:37.918 Simpl[38427:103777] [Simpl] call home: 3811 ms
+2026-11-25 00:49:38.695 Simpl[38427:103777] [Simpl] call assignment: 1977 ms
+2026-11-25 00:49:38.696 Simpl[38427:103777] SimplAssignment 1013: files 0, comments 0, steps Hand In, review 0, handIn 1, error -
+2026-11-25 00:49:38.697 Simpl[38427:103777] [Simpl] open Course home: 3159 ms (live)
+2026-11-25 00:49:40.366 Simpl[38427:103777] SimplMore group=Collaboration | files=PDF only
+2026-11-25 00:49:42.724 Simpl[38427:103777] [Simpl] open Assignment: 7186 ms (fetched)
+2026-11-25 00:49:42.756 Simpl[38427:103777] [Simpl] popup handin:101/1013: 580 × 560
+2026-11-25 00:49:43.362 Simpl[38427:103777] [Simpl] call courses: 5855 ms
+2026-11-25 00:49:46.012 Simpl[38427:103777] [Simpl] call convertInfo: 5644 ms
+2026-11-25 00:49:46.199 Simpl[38427:103777] [Simpl] call neighbours: 5043 ms
+2026-11-25 00:49:46.272 Simpl[38427:103777] [Simpl] call groups: 2910 ms
+2026-11-25 00:49:49.330 Simpl[38427:103777] [Simpl] call moreFromCanvas: 3057 ms
+2026-11-25 00:49:52.238 Simpl[38427:103777] [Simpl] shot: another copy of the app is in front; brought forward again

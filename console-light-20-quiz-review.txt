@@ -1,0 +1,25 @@
+2026-11-25 00:36:12.007 Simpl[3682:14547] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-25 00:36:13.000 Simpl[3682:14547] [Simpl] window: the app's screens (no page)
+2026-11-25 00:36:13.385 Simpl[3682:14547] [Simpl] appear Dashboard: 567 ms
+2026-11-25 00:36:13.615 Simpl[3682:14547] [Simpl] appear Dashboard: 797 ms
+2026-11-25 00:36:16.670 Simpl[3682:14547] [Simpl] open Dashboard: 3852 ms (kept)
+2026-11-25 00:36:19.656 Simpl[3682:14547] [Simpl] call quietColors: 6265 ms
+2026-11-25 00:36:19.658 Simpl[3682:14547] [Simpl] call quizIntro: 1179 ms
+2026-11-25 00:36:19.662 Simpl[3682:14547] [Simpl] call dashList: 5032 ms
+2026-11-25 00:36:19.662 Simpl[3682:14547] [Simpl] call dashList: 5033 ms
+2026-11-25 00:36:19.663 Simpl[3682:14547] [Simpl] call today: 4946 ms
+2026-11-25 00:36:19.663 Simpl[3682:14547] [Simpl] call today: 4947 ms
+2026-11-25 00:36:19.664 Simpl[3682:14547] [Simpl] call todayCounts: 3027 ms
+2026-11-25 00:36:19.668 Simpl[3682:14547] [Simpl] call todayCounts: 3030 ms
+2026-11-25 00:36:19.668 Simpl[3682:14547] [Simpl] call todayCounts: 3031 ms
+2026-11-25 00:36:19.668 Simpl[3682:14547] [Simpl] call todayCounts: 3031 ms
+2026-11-25 00:36:19.669 Simpl[3682:14547] [Simpl] call dashSkyline: 5039 ms
+2026-11-25 00:36:19.669 Simpl[3682:14547] [Simpl] call dashSkyline: 5040 ms
+2026-11-25 00:36:20.330 Simpl[3682:14547] [Simpl] call snapshot: 3096 ms
+2026-11-25 00:36:20.821 Simpl[3682:14547] [Simpl] open Dashboard: 8002 ms (live)
+2026-11-25 00:36:23.612 Simpl[3682:14547] [Simpl] call quizBegin: 3954 ms
+2026-11-25 00:36:24.253 Simpl[3682:14547] [Simpl] call courses: 3436 ms
+2026-11-25 00:36:24.950 Simpl[3682:14547] [Simpl] call groups: 696 ms
+2026-11-25 00:36:30.487 Simpl[3682:14547] [Simpl] call moreFromCanvas: 5537 ms
+2026-11-25 00:36:33.428 Simpl[3682:14547] [Simpl] shot: another copy of the app is in front; brought forward again
+2026-11-25 00:36:36.825 Simpl[3682:14547] NSQuitAlwaysKeepsWindows=NO

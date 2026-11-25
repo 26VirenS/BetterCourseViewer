@@ -1,0 +1,19 @@
+2026-11-25 00:38:54.823 Simpl[12230:38486] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-25 00:38:56.272 Simpl[12230:38486] [Simpl] window: the app's screens (no page)
+2026-11-25 00:38:56.948 Simpl[12230:38486] [Simpl] appear Course home: 982 ms
+2026-11-25 00:38:57.652 Simpl[12230:38486] [Simpl] appear Course home: 1686 ms
+2026-11-25 00:39:01.934 Simpl[12230:38486] [Simpl] open Course home: 5968 ms (kept)
+2026-11-25 00:39:02.556 Simpl[12230:38486] [Simpl] appear Discussion: 150 ms
+2026-11-25 00:39:02.988 Simpl[12230:38486] [Simpl] call quietColors: 6041 ms
+2026-11-25 00:39:02.990 Simpl[12230:38486] [Simpl] call snapshot: 584 ms
+2026-11-25 00:39:03.050 Simpl[12230:38486] [Simpl] call topic: 132 ms
+2026-11-25 00:39:03.062 Simpl[12230:38486] [Simpl] call home: 2781 ms
+2026-11-25 00:39:03.062 Simpl[12230:38486] [Simpl] call home: 2779 ms
+2026-11-25 00:39:05.485 Simpl[12230:38486] [Simpl] call home: 5255 ms
+2026-11-25 00:39:05.534 Simpl[12230:38486] [Simpl] open Discussion: 3128 ms (fetched)
+2026-11-25 00:39:05.721 Simpl[12230:38486] [Simpl] open Course home: 3288 ms (live)
+2026-11-25 00:39:06.655 Simpl[12230:38486] [Simpl] call neighbours: 1957 ms
+2026-11-25 00:39:06.721 Simpl[12230:38486] [Simpl] call courses: 3671 ms
+2026-11-25 00:39:07.640 Simpl[12230:38486] [Simpl] call groups: 917 ms
+2026-11-25 00:39:08.791 Simpl[12230:38486] [Simpl] call moreFromCanvas: 1151 ms
+2026-11-25 00:39:11.395 Simpl[12230:38486] [Simpl] shot: another copy of the app is in front; brought forward again

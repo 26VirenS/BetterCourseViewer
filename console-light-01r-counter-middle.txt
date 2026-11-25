@@ -1,0 +1,24 @@
+2026-11-25 00:50:28.086 Simpl[36550:97686] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-25 00:50:29.242 Simpl[36550:97686] [Simpl] window: the app's screens (no page)
+2026-11-25 00:50:29.680 Simpl[36550:97686] [Simpl] appear Dashboard: 776 ms
+2026-11-25 00:50:30.045 Simpl[36550:97686] [Simpl] appear Dashboard: 1140 ms
+2026-11-25 00:50:39.803 Simpl[36550:97686] [Simpl] open Dashboard: 10898 ms (kept)
+2026-11-25 00:50:45.854 Simpl[36550:97686] [Simpl] call quietColors: 16174 ms
+2026-11-25 00:50:45.924 Simpl[36550:97686] [Simpl] call dashList: 13598 ms
+2026-11-25 00:50:45.929 Simpl[36550:97686] [Simpl] call dashList: 13796 ms
+2026-11-25 00:50:45.955 Simpl[36550:97686] [Simpl] call today: 13554 ms
+2026-11-25 00:50:45.957 Simpl[36550:97686] [Simpl] call today: 13557 ms
+2026-11-25 00:50:46.171 Simpl[36550:97686] [Simpl] counter: tomorrow fades in (Reduce Motion)
+2026-11-25 00:50:46.185 Simpl[36550:97686] [Simpl] open Dashboard: 17280 ms (live)
+2026-11-25 00:50:46.212 Simpl[36550:97686] [Simpl] call todayCounts: 6422 ms
+2026-11-25 00:50:46.212 Simpl[36550:97686] [Simpl] call todayCounts: 6423 ms
+2026-11-25 00:50:46.212 Simpl[36550:97686] [Simpl] call todayCounts: 6491 ms
+2026-11-25 00:50:46.213 Simpl[36550:97686] [Simpl] call dashSkyline: 13887 ms
+2026-11-25 00:50:46.213 Simpl[36550:97686] [Simpl] call todayCounts: 6491 ms
+2026-11-25 00:50:46.213 Simpl[36550:97686] [Simpl] call snapshot: 610 ms
+2026-11-25 00:50:46.932 Simpl[36550:97686] [Simpl] call dashSkyline: 14801 ms
+2026-11-25 00:50:48.021 Simpl[36550:97686] [Simpl] counter: tomorrow fades in (Reduce Motion)
+2026-11-25 00:50:48.976 Simpl[36550:97686] [Simpl] call courses: 2049 ms
+2026-11-25 00:50:51.451 Simpl[36550:97686] [Simpl] call todaySheet: 3032 ms
+2026-11-25 00:50:52.171 Simpl[36550:97686] [Simpl] call groups: 3193 ms
+2026-11-25 00:50:53.577 Simpl[36550:97686] [Simpl] call moreFromCanvas: 1404 ms

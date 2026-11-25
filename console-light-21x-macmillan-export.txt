@@ -1,0 +1,38 @@
+2026-11-25 00:49:39.880 Simpl[38984:105139] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-25 00:49:42.352 Simpl[38984:105139] [Simpl] window: the app's screens (no page)
+2026-11-25 00:49:43.347 Simpl[38984:105139] [Simpl] appear Dashboard: 1352 ms
+2026-11-25 00:49:44.151 Simpl[38984:105139] [Simpl] appear Dashboard: 2206 ms
+2026-11-25 00:49:49.696 Simpl[38984:105139] [Simpl] open Dashboard: 7751 ms (kept)
+2026-11-25 00:49:50.920 Simpl[38984:105139] [Simpl] popup look: 984 × 591, 20 in from the window (sidebar out)
+2026-11-25 00:49:53.766 Simpl[38984:105139] [Simpl] call quietColors: 10484 ms
+2026-11-25 00:49:53.771 Simpl[38984:105139] [Simpl] call toolLaunch: 2498 ms
+2026-11-25 00:49:53.772 Simpl[38984:105139] [Simpl] macmillan popup: opened
+2026-11-25 00:49:54.174 Simpl[38984:105139] [Simpl] call todayCounts: 4508 ms
+2026-11-25 00:49:54.174 Simpl[38984:105139] [Simpl] call todayCounts: 4533 ms
+2026-11-25 00:49:54.174 Simpl[38984:105139] [Simpl] call today: 7202 ms
+2026-11-25 00:49:54.176 Simpl[38984:105139] [Simpl] call today: 7203 ms
+2026-11-25 00:49:54.177 Simpl[38984:105139] [Simpl] call dashList: 7268 ms
+2026-11-25 00:49:54.177 Simpl[38984:105139] [Simpl] call dashList: 7269 ms
+2026-11-25 00:49:54.178 Simpl[38984:105139] [Simpl] call dashSkyline: 7269 ms
+2026-11-25 00:49:54.178 Simpl[38984:105139] [Simpl] call dashSkyline: 7270 ms
+2026-11-25 00:49:54.178 Simpl[38984:105139] [Simpl] call todayCounts: 4512 ms
+2026-11-25 00:49:54.178 Simpl[38984:105139] [Simpl] call todayCounts: 4537 ms
+2026-11-25 00:49:54.178 Simpl[38984:105139] [Simpl] call snapshot: 3914 ms
+2026-11-25 00:49:55.954 Simpl[38984:105139] [Simpl] open Dashboard: 14009 ms (live)
+2026-11-25 00:49:55.956 Simpl[38984:105139] [Simpl] popup look: 984 × 589, 20 in from the window (sidebar out)
+2026-11-25 00:49:56.078 Simpl[38984:105139] [Simpl] call courses: 1661 ms
+2026-11-25 00:49:56.778 Simpl[38984:105139] [Simpl] call groups: 699 ms
+2026-11-25 00:49:57.269 Simpl[38984:105139] [Simpl] macmillan popup: front end, buttons Resources, Solution, Next Question
+2026-11-25 00:49:57.269 Simpl[38984:105139] [Simpl] macmillan popup: the question drawn for light glass
+2026-11-25 00:49:57.270 Simpl[38984:105139] [Simpl] macmillan popup: rail heard, 4 questions, 1 done, question 1 open
+2026-11-25 00:49:57.270 Simpl[38984:105139] [Simpl] look popup: page at 69% (its 1016 wide in 703)
+2026-11-25 00:49:57.357 Simpl[38984:105139] [Simpl] export questions: 4 to picture (macmillan)
+2026-11-25 00:49:57.426 Simpl[38984:105139] [Simpl] macmillan look: drawn in localhost:8800, 4 questions, item-1-success-row marked
+2026-11-25 00:49:59.009 Simpl[38984:105139] [Simpl] call moreFromCanvas: 2229 ms
+2026-11-25 00:50:00.661 Simpl[38984:105139] [Simpl] export questions: question 1 pictured whole, 2 views laid together (485 px tall, the view 441)
+2026-11-25 00:50:05.863 Simpl[38984:105139] [Simpl] popup look: 984 × 591, 20 in from the window (sidebar out)
+2026-11-25 00:50:07.186 Simpl[38984:105139] [Simpl] export questions: question 2 pictured whole, 3 views laid together (812 px tall, the view 443)
+2026-11-25 00:50:09.432 Simpl[38984:105139] [Simpl] export questions: question 3 pictured whole, 2 views laid together (449 px tall, the view 443)
+2026-11-25 00:50:11.886 Simpl[38984:105139] [Simpl] export questions: question 4 pictured whole, 3 views laid together (865 px tall, the view 443)
+2026-11-25 00:50:11.911 Simpl[38984:105139] [Simpl] export questions: 4 of 4 pictured, saved to W8 Homework Forces in Motion questions.zip (macmillan)
+2026-11-25 00:50:44.178 Simpl[38984:105139] [Simpl] live: dashboard waits (inactive)

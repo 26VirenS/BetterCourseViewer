@@ -1,0 +1,30 @@
+2026-11-25 00:57:37.541 Simpl[50789:135619] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-25 00:57:43.389 Simpl[50789:135619] [Simpl] window: the app's screens (/d2l/home)
+2026-11-25 00:57:43.818 Simpl[50789:135619] [Simpl] appear Dashboard: 1570 ms
+2026-11-25 00:57:43.848 Simpl[50789:135619] [Simpl] appear Dashboard: 1600 ms
+2026-11-25 00:57:45.463 Simpl[50789:135619] [Simpl] appear Course home: 122 ms
+2026-11-25 00:57:45.907 Simpl[50789:135619] [Simpl] appear Discussion: 566 ms
+2026-11-25 00:57:46.164 Simpl[50789:135619] [Simpl] call quietColors: 2348 ms
+2026-11-25 00:57:46.182 Simpl[50789:135619] [Simpl] call dashSkyline: 717 ms
+2026-11-25 00:57:46.183 Simpl[50789:135619] [Simpl] call dashSkyline: 718 ms
+2026-11-25 00:57:46.183 Simpl[50789:135619] [Simpl] call dashList: 718 ms
+2026-11-25 00:57:46.184 Simpl[50789:135619] [Simpl] call dashList: 719 ms
+2026-11-25 00:57:46.184 Simpl[50789:135619] [Simpl] call today: 718 ms
+2026-11-25 00:57:46.185 Simpl[50789:135619] [Simpl] call today: 720 ms
+2026-11-25 00:57:46.185 Simpl[50789:135619] [Simpl] call snapshot: 720 ms
+2026-11-25 00:57:47.056 Simpl[50789:135619] [Simpl] open Dashboard: 1714 ms (fetched)
+2026-11-25 00:57:47.072 Simpl[50789:135619] [Simpl] call home: 1222 ms
+2026-11-25 00:57:47.074 Simpl[50789:135619] [Simpl] call home: 1224 ms
+2026-11-25 00:57:47.417 Simpl[50789:135619] [Simpl] call todayCounts: 1257 ms
+2026-11-25 00:57:47.418 Simpl[50789:135619] [Simpl] call todayCounts: 1254 ms
+2026-11-25 00:57:47.418 Simpl[50789:135619] [Simpl] call todayCounts: 1254 ms
+2026-11-25 00:57:47.418 Simpl[50789:135619] [Simpl] call todayCounts: 1258 ms
+2026-11-25 00:57:47.419 Simpl[50789:135619] [Simpl] open Course home: 2078 ms (fetched)
+2026-11-25 00:57:47.419 Simpl[50789:135619] [Simpl] call topic: 1251 ms
+2026-11-25 00:57:48.060 Simpl[50789:135619] [Simpl] call dashSkyline: 1877 ms
+2026-11-25 00:57:48.061 Simpl[50789:135619] [Simpl] call dashSkyline: 1879 ms
+2026-11-25 00:57:48.063 Simpl[50789:135619] [Simpl] open Discussion: 2722 ms (fetched)
+2026-11-25 00:57:48.158 Simpl[50789:135619] [Simpl] call courses: 1512 ms
+2026-11-25 00:57:48.438 Simpl[50789:135619] [Simpl] call neighbours: 693 ms
+2026-11-25 00:57:48.441 Simpl[50789:135619] [Simpl] call groups: 282 ms
+2026-11-25 00:57:48.932 Simpl[50789:135619] [Simpl] call moreFromCanvas: 491 ms

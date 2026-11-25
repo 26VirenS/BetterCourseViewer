@@ -1,0 +1,29 @@
+2026-11-25 00:48:14.247 Simpl[30218:83601] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-25 00:48:16.225 Simpl[30218:83601] [Simpl] window: the app's screens (no page)
+2026-11-25 00:48:17.295 Simpl[30218:83601] [Simpl] appear Dashboard: 1395 ms
+2026-11-25 00:48:17.774 Simpl[30218:83601] [Simpl] appear Dashboard: 1874 ms
+2026-11-25 00:48:35.974 Simpl[30218:83601] [Simpl] open Dashboard: 20075 ms (kept)
+2026-11-25 00:48:37.934 Simpl[30218:83601] [Simpl] call quietColors: 20639 ms
+2026-11-25 00:48:37.952 Simpl[30218:83601] [Simpl] call dashList: 15855 ms
+2026-11-25 00:48:37.954 Simpl[30218:83601] [Simpl] call dashList: 15865 ms
+2026-11-25 00:48:37.956 Simpl[30218:83601] [Simpl] call today: 13351 ms
+2026-11-25 00:48:37.964 Simpl[30218:83601] [Simpl] call today: 13359 ms
+2026-11-25 00:48:37.964 Simpl[30218:83601] [Simpl] call todayCounts: 2132 ms
+2026-11-25 00:48:37.964 Simpl[30218:83601] [Simpl] call todayCounts: 2138 ms
+2026-11-25 00:48:37.964 Simpl[30218:83601] [Simpl] call todayCounts: 2132 ms
+2026-11-25 00:48:37.964 Simpl[30218:83601] [Simpl] call todayCounts: 2132 ms
+2026-11-25 00:48:37.965 Simpl[30218:83601] [Simpl] call dashSkyline: 15875 ms
+2026-11-25 00:48:37.966 Simpl[30218:83601] [Simpl] call dashSkyline: 15877 ms
+2026-11-25 00:48:38.822 Simpl[30218:83601] [Simpl] call snapshot: 1897 ms
+2026-11-25 00:48:38.959 Simpl[30218:83601] [Simpl] open Dashboard: 23059 ms (live)
+2026-11-25 00:48:40.318 Simpl[30218:83601] [Simpl] call courses: 1360 ms
+2026-11-25 00:48:41.687 Simpl[30218:83601] [Simpl] graph: drew y=x^2 for the picture
+2026-11-25 00:48:41.691 Simpl[30218:83601] [Simpl] call groups: 1371 ms
+2026-11-25 00:48:42.744 Simpl[30218:83601] [Simpl] call moreFromCanvas: 1041 ms
+2026-11-25 00:48:45.972 Simpl[30218:83601] [Simpl] popup tool: 984 × 591, 20 in from the window (sidebar out)
+2026-11-25 00:48:46.609 Simpl[30218:83601] [Simpl] pin full screen: graph (carried: nothing)
+2026-11-25 00:48:50.416 Simpl[30218:83601] [Simpl] popup tool: 984 × 589, 20 in from the window (sidebar out)
+2026-11-25 00:48:50.551 Simpl[30218:83601] [Simpl] graph: the pin's graph read (463 characters)
+2026-11-25 00:48:54.653 Simpl[30218:83601] [Simpl] popup tool: 984 × 591, 20 in from the window (sidebar out)
+2026-11-25 00:48:57.158 Simpl[30218:83601] [Simpl] graph: the pin's graph put in the whole one
+2026-11-25 00:49:22.240 Simpl[30218:83601] [Simpl] live: dashboard waits (inactive)

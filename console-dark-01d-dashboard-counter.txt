@@ -1,0 +1,25 @@
+2026-11-25 00:37:10.398 Simpl[6175:21250] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-25 00:37:11.460 Simpl[6175:21250] [Simpl] window: the app's screens (no page)
+2026-11-25 00:37:12.101 Simpl[6175:21250] [Simpl] appear Dashboard: 840 ms
+2026-11-25 00:37:12.649 Simpl[6175:21250] [Simpl] appear Dashboard: 1388 ms
+2026-11-25 00:37:17.152 Simpl[6175:21250] [Simpl] open Dashboard: 5891 ms (kept)
+2026-11-25 00:37:17.749 Simpl[6175:21250] [Simpl] call quietColors: 5648 ms
+2026-11-25 00:37:17.750 Simpl[6175:21250] [Simpl] call dashList: 2682 ms
+2026-11-25 00:37:17.750 Simpl[6175:21250] [Simpl] call dashList: 2630 ms
+2026-11-25 00:37:17.751 Simpl[6175:21250] [Simpl] call dashSkyline: 2631 ms
+2026-11-25 00:37:17.753 Simpl[6175:21250] [Simpl] call dashSkyline: 2685 ms
+2026-11-25 00:37:17.800 Simpl[6175:21250] [Simpl] call today: 2419 ms
+2026-11-25 00:37:17.801 Simpl[6175:21250] [Simpl] call today: 2420 ms
+2026-11-25 00:37:17.899 Simpl[6175:21250] [Simpl] counter: next fades in (Reduce Motion)
+2026-11-25 00:37:17.900 Simpl[6175:21250] [Simpl] open Dashboard: 6639 ms (live)
+2026-11-25 00:37:17.904 Simpl[6175:21250] [Simpl] call todayCounts: 758 ms
+2026-11-25 00:37:17.904 Simpl[6175:21250] [Simpl] call todayCounts: 758 ms
+2026-11-25 00:37:17.904 Simpl[6175:21250] [Simpl] call todayCounts: 758 ms
+2026-11-25 00:37:17.905 Simpl[6175:21250] [Simpl] call todayCounts: 758 ms
+2026-11-25 00:37:17.965 Simpl[6175:21250] [Simpl] call snapshot: 653 ms
+2026-11-25 00:37:21.250 Simpl[6175:21250] [Simpl] counter: next fades in (Reduce Motion)
+2026-11-25 00:37:21.512 Simpl[6175:21250] [Simpl] call courses: 3411 ms
+2026-11-25 00:37:21.780 Simpl[6175:21250] [Simpl] call groups: 267 ms
+2026-11-25 00:37:22.192 Simpl[6175:21250] [Simpl] call todaySheet: 759 ms
+2026-11-25 00:37:24.168 Simpl[6175:21250] [Simpl] call moreFromCanvas: 2388 ms
+2026-11-25 00:37:27.296 Simpl[6175:21250] [Simpl] shot: another copy of the app is in front; brought forward again

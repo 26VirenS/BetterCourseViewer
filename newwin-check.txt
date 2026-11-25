@@ -1,0 +1,1 @@
+ok   Canvas's page for a tool it opens in a new window: its launch sent on in the tool window

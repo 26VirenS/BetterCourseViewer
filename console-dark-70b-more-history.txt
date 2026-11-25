@@ -1,0 +1,25 @@
+2026-11-25 00:37:19.480 Simpl[6515:22201] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-25 00:37:20.803 Simpl[6515:22201] [Simpl] window: the app's screens (no page)
+2026-11-25 00:37:21.117 Simpl[6515:22201] [Simpl] appear Dashboard: 457 ms
+2026-11-25 00:37:21.374 Simpl[6515:22201] [Simpl] appear Dashboard: 715 ms
+2026-11-25 00:37:25.463 Simpl[6515:22201] [Simpl] open Dashboard: 4804 ms (kept)
+2026-11-25 00:37:26.412 Simpl[6515:22201] [Simpl] call quietColors: 5296 ms
+2026-11-25 00:37:26.412 Simpl[6515:22201] [Simpl] call moreHistory: 631 ms
+2026-11-25 00:37:26.636 Simpl[6515:22201] [Simpl] call dashList: 4484 ms
+2026-11-25 00:37:26.644 Simpl[6515:22201] [Simpl] call dashList: 4496 ms
+2026-11-25 00:37:26.682 Simpl[6515:22201] [Simpl] call todayCounts: 1237 ms
+2026-11-25 00:37:26.683 Simpl[6515:22201] [Simpl] call todayCounts: 1238 ms
+2026-11-25 00:37:26.683 Simpl[6515:22201] [Simpl] call todayCounts: 1238 ms
+2026-11-25 00:37:26.683 Simpl[6515:22201] [Simpl] call todayCounts: 1238 ms
+2026-11-25 00:37:26.684 Simpl[6515:22201] [Simpl] call today: 4198 ms
+2026-11-25 00:37:26.686 Simpl[6515:22201] [Simpl] call today: 4199 ms
+2026-11-25 00:37:26.689 Simpl[6515:22201] [Simpl] call dashSkyline: 4537 ms
+2026-11-25 00:37:26.691 Simpl[6515:22201] [Simpl] call dashSkyline: 4542 ms
+2026-11-25 00:37:26.695 Simpl[6515:22201] [Simpl] call snapshot: 912 ms
+2026-11-25 00:37:27.090 Simpl[6515:22201] [Simpl] popup more: 440 × 208
+2026-11-25 00:37:27.095 Simpl[6515:22201] [Simpl] popup more: 440 × 260
+2026-11-25 00:37:27.650 Simpl[6515:22201] [Simpl] open Dashboard: 6991 ms (live)
+2026-11-25 00:37:27.781 Simpl[6515:22201] [Simpl] call courses: 693 ms
+2026-11-25 00:37:28.032 Simpl[6515:22201] [Simpl] call groups: 250 ms
+2026-11-25 00:37:29.075 Simpl[6515:22201] [Simpl] call moreFromCanvas: 1042 ms
+2026-11-25 00:37:32.528 Simpl[6515:22201] [Simpl] shot: another copy of the app is in front; brought forward again

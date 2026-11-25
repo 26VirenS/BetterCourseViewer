@@ -1,0 +1,15 @@
+2026-11-25 00:46:19.342 Simpl[26984:73597] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-25 00:46:24.060 Simpl[26984:73597] [Simpl] window: the app's screens (no page)
+2026-11-25 00:46:25.117 Simpl[26984:73597] [Simpl] appear Course grades: 1444 ms
+2026-11-25 00:46:26.924 Simpl[26984:73597] [Simpl] appear Course grades: 3250 ms
+2026-11-25 00:46:31.914 Simpl[26984:73597] [Simpl] call quietColors: 6794 ms
+2026-11-25 00:46:32.113 Simpl[26984:73597] [Simpl] call snapshot: 334 ms
+2026-11-25 00:46:32.593 Simpl[26984:73597] [Simpl] call courseGrades: 7471 ms
+2026-11-25 00:46:32.601 Simpl[26984:73597] [Simpl] call home: 1680 ms
+2026-11-25 00:46:32.602 Simpl[26984:73597] [Simpl] call courseGrades: 5675 ms
+2026-11-25 00:46:35.617 Simpl[26984:73597] [Simpl] call courses: 3333 ms
+2026-11-25 00:46:35.620 Simpl[26984:73597] [Simpl] open Course grades: 11942 ms (fetched)
+2026-11-25 00:46:36.125 Simpl[26984:73597] [Simpl] call groups: 507 ms
+2026-11-25 00:46:36.125 Simpl[26984:73597] [Simpl] call courseGrades: 507 ms
+2026-11-25 00:46:38.634 Simpl[26984:73597] [Simpl] call moreFromCanvas: 2507 ms
+2026-11-25 00:46:38.980 Simpl[26984:73597] [Simpl] grades what-if: at the page's foot the last row ends 16 pt above the bar (at the foot, 3 scrolls)

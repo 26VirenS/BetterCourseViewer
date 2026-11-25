@@ -1,0 +1,2 @@
+ok   the prompt was put up over the window (console-light-23h-update-prompt)
+ok   the prompt was put up over the window (console-dark-23h-update-prompt)

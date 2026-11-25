@@ -1,0 +1,6 @@
+ok   the browser read the mock's gallery: community tools: the gallery read: 14 tools, 13 to add, 1 needing a newer Simpl
+ok   a tool added before the browser opened: community tools: added mockgrade (Grade points, version 1)
+ok   two tools added to the Community section: community tools: added mockohms community tools: added mocktip 
+ok   an added tool opened and worked out: community tools: mockohms worked out: Current 3 A · Power 36 W
+ok   with no connection the browser read nothing and said so: community tools: Simpl Community not reached (code -1004)
+ok   no tool was refused or missing as it was added: 

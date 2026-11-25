@@ -1,0 +1,2 @@
+2026-11-25 00:46:23.957 Simpl[27050:73788] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-25 00:46:36.686 Simpl[27050:73788] [Simpl] shot: another copy of the app is in front; brought forward again

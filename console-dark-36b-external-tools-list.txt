@@ -1,0 +1,20 @@
+2026-11-25 00:53:30.788 Simpl[43163:114622] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-25 00:53:36.001 Simpl[43163:114622] [Simpl] window: the app's screens (no page)
+2026-11-25 00:53:38.836 Simpl[43163:114622] [Simpl] appear External Tools: 4080 ms
+2026-11-25 00:53:41.033 Simpl[43163:114622] [Simpl] appear External Tools: 6276 ms
+2026-11-25 00:53:52.337 Simpl[43163:114622] [Simpl] call quietColors: 13503 ms
+2026-11-25 00:53:52.339 Simpl[43163:114622] [Simpl] call snapshot: 202 ms
+2026-11-25 00:53:52.871 Simpl[43163:114622] [Simpl] call externalTools: 11835 ms
+2026-11-25 00:53:52.871 Simpl[43163:114622] [Simpl] tool list: opening Knewton Alta
+2026-11-25 00:53:52.871 Simpl[43163:114622] [Simpl] call externalTools: 14035 ms
+2026-11-25 00:53:52.872 Simpl[43163:114622] [Simpl] tool list: opening Knewton Alta
+2026-11-25 00:53:53.982 Simpl[43163:114622] [Simpl] tool list shown: Knewton Alta
+2026-11-25 00:53:53.996 Simpl[43163:114622] [Simpl] tool list shown: Knewton Alta
+2026-11-25 00:53:54.220 Simpl[43163:114622] [Simpl] tool list closed: Knewton Alta
+2026-11-25 00:53:54.441 Simpl[43163:114622] [Simpl] open External Tools: 19685 ms (fetched)
+2026-11-25 00:53:54.469 Simpl[43163:114622] [Simpl] call courses: 1962 ms
+2026-11-25 00:53:55.630 Simpl[43163:114622] [Simpl] tool logo: tool.example.com none
+2026-11-25 00:53:55.644 Simpl[43163:114622] [Simpl] tool logo: lmslink.bfwpub.com glyph
+2026-11-25 00:53:55.693 Simpl[43163:114622] [Simpl] call groups: 1224 ms
+2026-11-25 00:53:56.616 Simpl[43163:114622] [Simpl] tool logo: session.masteringphysics.com glyph
+2026-11-25 00:53:56.739 Simpl[43163:114622] [Simpl] call moreFromCanvas: 1045 ms

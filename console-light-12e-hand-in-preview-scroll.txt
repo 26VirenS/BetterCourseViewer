@@ -1,0 +1,28 @@
+2026-11-25 00:45:06.575 Simpl[26604:74609] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-25 00:45:09.019 Simpl[26604:74609] [Simpl] window: the app's screens (no page)
+2026-11-25 00:45:09.679 Simpl[26604:74609] [Simpl] appear Course home: 827 ms
+2026-11-25 00:45:10.047 Simpl[26604:74609] [Simpl] appear Course home: 1195 ms
+2026-11-25 00:45:12.655 Simpl[26604:74609] [Simpl] open Course home: 3803 ms (kept)
+2026-11-25 00:45:12.976 Simpl[26604:74609] [Simpl] appear Assignment: 109 ms
+2026-11-25 00:45:15.217 Simpl[26604:74609] SimplMore group=Effort
+2026-11-25 00:45:15.856 Simpl[26604:74609] [Simpl] open Assignment: 2990 ms (kept)
+2026-11-25 00:45:15.878 Simpl[26604:74609] [Simpl] call quietColors: 6209 ms
+2026-11-25 00:45:15.881 Simpl[26604:74609] [Simpl] call neighbours: 471 ms
+2026-11-25 00:45:15.882 Simpl[26604:74609] [Simpl] call neighbours: 2195 ms
+2026-11-25 00:45:15.882 Simpl[26604:74609] [Simpl] call home: 4055 ms
+2026-11-25 00:45:15.949 Simpl[26604:74609] [Simpl] call home: 4125 ms
+2026-11-25 00:45:15.951 Simpl[26604:74609] [Simpl] call home: 4308 ms
+2026-11-25 00:45:16.284 Simpl[26604:74609] [Simpl] call snapshot: 3418 ms
+2026-11-25 00:45:16.344 Simpl[26604:74609] [Simpl] open Course home: 3478 ms (live)
+2026-11-25 00:45:16.634 Simpl[26604:74609] [Simpl] call assignment: 1816 ms
+2026-11-25 00:45:16.634 Simpl[26604:74609] SimplAssignment 1012: files 0, comments 0, steps Hand In, review 0, handIn 1, error -
+2026-11-25 00:45:16.878 Simpl[26604:74609] [Simpl] open Assignment: 4011 ms (live)
+2026-11-25 00:45:16.878 Simpl[26604:74609] [Simpl] popup handin:101/1012: 580 × 560
+2026-11-25 00:45:16.926 Simpl[26604:74609] [Simpl] call courses: 582 ms
+2026-11-25 00:45:17.172 Simpl[26604:74609] [Simpl] call groups: 246 ms
+2026-11-25 00:45:18.363 Simpl[26604:74609] SimplHandIn added long-reading.pdf (1 files)
+2026-11-25 00:45:18.556 Simpl[26604:74609] SimplPreview: long-reading.pdf in PDFKit (6 pages)
+IOServiceMatchingfailed for: AppleM2ScalerParavirtDriver
+2026-11-25 00:45:19.686 Simpl[26604:74609] [Simpl] popup handin:101/1012: 977 × 560
+2026-11-25 00:45:19.920 Simpl[26604:74609] [Simpl] call moreFromCanvas: 2747 ms
+2026-11-25 00:45:24.585 Simpl[26604:74609] SimplScrollProbe: PDF, pages 6, scrolled yes (4000 → 3624)

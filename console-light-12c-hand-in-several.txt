@@ -1,0 +1,29 @@
+2026-11-25 00:55:08.880 Simpl[45095:121307] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /var/folders/q2/p1t6rgxj5fj32g1dc7dmd49r0000gn/T/com.simplcourses.mac.savedState
+2026-11-25 00:55:09.735 Simpl[45095:121307] [Simpl] window: the app's screens (no page)
+2026-11-25 00:55:10.173 Simpl[45095:121307] [Simpl] appear Course home: 564 ms
+2026-11-25 00:55:10.689 Simpl[45095:121307] [Simpl] appear Course home: 1081 ms
+2026-11-25 00:55:13.544 Simpl[45095:121307] [Simpl] open Course home: 3936 ms (kept)
+2026-11-25 00:55:14.440 Simpl[45095:121307] [Simpl] appear Assignment: 422 ms
+2026-11-25 00:55:15.708 Simpl[45095:121307] [Simpl] call quietColors: 5536 ms
+2026-11-25 00:55:15.711 Simpl[45095:121307] [Simpl] call snapshot: 1693 ms
+2026-11-25 00:55:15.846 Simpl[45095:121307] [Simpl] call home: 3463 ms
+2026-11-25 00:55:15.846 Simpl[45095:121307] [Simpl] call home: 3402 ms
+2026-11-25 00:55:15.847 Simpl[45095:121307] [Simpl] call neighbours: 1012 ms
+2026-11-25 00:55:15.850 Simpl[45095:121307] [Simpl] call home: 3382 ms
+2026-11-25 00:55:15.886 Simpl[45095:121307] [Simpl] call assignment: 342 ms
+2026-11-25 00:55:15.904 Simpl[45095:121307] SimplAssignment 1012: files 0, comments 0, steps Hand In, review 0, handIn 1, error -
+2026-11-25 00:55:17.577 Simpl[45095:121307] SimplMore group=Effort
+2026-11-25 00:55:19.478 Simpl[45095:121307] [Simpl] open Course home: 5459 ms (live)
+2026-11-25 00:55:19.481 Simpl[45095:121307] [Simpl] open Assignment: 5464 ms (fetched)
+2026-11-25 00:55:19.481 Simpl[45095:121307] [Simpl] popup handin:101/1012: 580 × 560
+2026-11-25 00:55:19.535 Simpl[45095:121307] SimplHandIn adding 3 files at once
+2026-11-25 00:55:19.538 Simpl[45095:121307] SimplHandIn added calendar.png (1 files)
+2026-11-25 00:55:19.541 Simpl[45095:121307] SimplHandIn added grades.png (2 files)
+2026-11-25 00:55:19.543 Simpl[45095:121307] SimplHandIn added dashboard.png (3 files)
+2026-11-25 00:55:19.699 Simpl[45095:121307] SimplHandIn added 3 files at once: 3 in
+2026-11-25 00:55:19.760 Simpl[45095:121307] SimplPreview: dashboard.png in Quick Look
+2026-11-25 00:55:22.127 Simpl[45095:121307] [Simpl] popup handin:101/1012: 977 × 560
+2026-11-25 00:55:25.977 Simpl[45095:121307] [Simpl] call neighbours: 8075 ms
+2026-11-25 00:55:25.980 Simpl[45095:121307] [Simpl] call courses: 10135 ms
+2026-11-25 00:55:28.893 Simpl[45095:121307] [Simpl] call groups: 2800 ms
+2026-11-25 00:55:30.472 Simpl[45095:121307] [Simpl] call moreFromCanvas: 1577 ms
