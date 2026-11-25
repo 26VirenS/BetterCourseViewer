@@ -539,7 +539,7 @@ struct TourOverlay: View {
             }
             .offset(x: x, y: y)
         .id(step)
-        .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.96, anchor: below ? .top : .bottom)))
+        .transition(reduceMotion ? AnyTransition.opacity : AnyTransition.opacity.combined(with: .scale(scale: 0.96, anchor: below ? .top : .bottom)))
         .animation(.spring(duration: 0.4, bounce: 0), value: x)
         .animation(.spring(duration: 0.4, bounce: 0), value: y)
     }
