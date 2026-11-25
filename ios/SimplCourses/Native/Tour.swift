@@ -569,9 +569,9 @@ struct TourOverlay: View {
                     .padding(.top, 3)
             }
             if step == .bar { dots.padding(.top, 9) }
-            if let b = button(step) {
-                Button(action: b.1) {
-                    Text(b.0)
+            if let words = button(step) {
+                Button { press(step) } label: {
+                    Text(words)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity, minHeight: 36)
@@ -636,15 +636,25 @@ struct TourOverlay: View {
         }
     }
 
-    private func button(_ step: Tour.Step) -> (String, @MainActor () -> Void)? {
+    /// The tip's button's words, if it has one: Next, Done, or (the spot not found) what the spot would do.
+    private func button(_ step: Tour.Step) -> String? {
         switch step {
-        case .bar: return tour.barPhase >= 4 ? ("Next", { tour.next() }) : nil
-        case .end: return ("Done", { tour.done() })
-        default:
-            guard tour.stuck else { return nil }
-            let words: [Tour.Step: String] = [.card: "Open a Card", .closeSheet: "Close It", .coursesTab: "Go to Courses", .firstCourse: "Open It",
-                                              .back: "Go Back", .secondCourse: "Open It", .switchCourse: "Switch"]
-            return (words[step] ?? "Next", { tour.act(step) })
+        case .bar: return tour.barPhase >= 4 ? "Next" : nil
+        case .end: return "Done"
+        case .card: return tour.stuck ? "Open a Card" : nil
+        case .closeSheet: return tour.stuck ? "Close It" : nil
+        case .coursesTab: return tour.stuck ? "Go to Courses" : nil
+        case .back: return tour.stuck ? "Go Back" : nil
+        case .switchCourse: return tour.stuck ? "Switch" : nil
+        case .firstCourse, .secondCourse: return tour.stuck ? "Open It" : nil
+        }
+    }
+
+    private func press(_ step: Tour.Step) {
+        switch step {
+        case .bar: tour.next()
+        case .end: tour.done()
+        default: tour.act(step)
         }
     }
 
