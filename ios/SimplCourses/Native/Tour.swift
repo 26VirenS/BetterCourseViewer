@@ -172,7 +172,12 @@ final class Tour: ObservableObject {
         demo.link = .on
         demo.began()
         barTask = Task { [weak self] in
-            let waits: [UInt64] = [2_200, 2_200, 2_400, 1_400]
+            // (the simulator suite's run: each colour longer, for its picture)
+            let waits: [UInt64] = self?.drive == true ? [4_000, 4_000, 4_000, 3_000] : [2_200, 2_200, 2_400, 1_400]
+            if self?.drive == true {
+                try? await Task.sleep(nanoseconds: 800_000_000)
+                self?.shot("bar-blue")
+            }
             for (i, ms) in waits.enumerated() {
                 try? await Task.sleep(nanoseconds: ms * 1_000_000)
                 guard let self, !Task.isCancelled, self.step == .bar else { return }
@@ -285,7 +290,12 @@ final class Tour: ObservableObject {
             guard engine.tab == .today, let f = frames[.card] else { return nil }
             return around(f, 5, radius: 25)
         case .closeSheet:
-            let found = TourFinder.sheetDone(in: app, log: dump("sheet")) ?? frames[.sheetDone].map(TourFinder.barButton)
+            // (the words' own frame where it is the window's — inside UIKit's button, a little wider than the glass — else
+            // the button)
+            let button = TourFinder.sheetDone(in: app, log: dump("sheet"))
+            let words = frames[.sheetDone]
+            var found = button ?? words.map(TourFinder.barButton)
+            if let button, let words, button.contains(CGPoint(x: words.midX, y: words.midY)) { found = words.insetBy(dx: -4, dy: -4) }
             guard let f = found else { return nil }
             return around(f, 4)
         case .coursesTab:
@@ -300,7 +310,8 @@ final class Tour: ObservableObject {
             return (ring: r, hole: f.insetBy(dx: -8, dy: -8), radius: radius)
         case .switchCourse:
             guard let edge = engine.splitEdge[.courses] else { return nil }
-            let found = TourFinder.trailingButton(leftOf: edge, in: app, log: dump("switch")) ?? frames[.switcher].map(TourFinder.barButton)
+            let found = TourFinder.named("Switch course", leftOf: edge, in: app, log: dump("switch"))
+                ?? TourFinder.trailingButton(leftOf: edge, in: app, log: false)
             guard let f = found else { return nil }
             // (the menu it opens comes down under it: the whole left column takes a press)
             let column = CGRect(x: 0, y: 0, width: edge, height: app.bounds.height)
@@ -365,7 +376,14 @@ final class Tour: ObservableObject {
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: 1_500_000_000)
             guard let self, self.step == s else { return }
-            let names: [Step: String] = [.card: "card", .closeSheet: "close", .bar: "bar-blue", .coursesTab: "courses-tab", .firstCourse: "first-course",
+            if s == .bar {
+                // (its colours pictured as they come: playBar)
+                while self.step == .bar && self.barPhase < 4 { try? await Task.sleep(nanoseconds: 200_000_000) }
+                try? await Task.sleep(nanoseconds: 4_000_000_000)
+                if self.step == .bar { self.act(.bar) }
+                return
+            }
+            let names: [Step: String] = [.card: "card", .closeSheet: "close", .coursesTab: "courses-tab", .firstCourse: "first-course",
                                          .back: "back", .secondCourse: "second-course", .switchCourse: "switch-course", .end: "end"]
             self.shot(names[s] ?? s.rawValue)
             if let r = self.ring { self.say("ring \(Int(r.minX)),\(Int(r.minY)) \(Int(r.width))x\(Int(r.height))") } else { self.say("no ring") }
@@ -374,10 +392,7 @@ final class Tour: ObservableObject {
             _ = self.locate(s)
             self.writeOut = false
             for (t, f) in self.frames { self.say("view \(t) at \(Int(f.minX)),\(Int(f.minY)) \(Int(f.width))x\(Int(f.height))") }
-            if s == .bar {
-                while self.step == .bar && self.barPhase < 4 { try? await Task.sleep(nanoseconds: 200_000_000) }
-            }
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            try? await Task.sleep(nanoseconds: 4_000_000_000) // (time for the picture, however busy the simulator)
             guard self.step == s else { return }
             self.act(s)
         }
@@ -721,19 +736,20 @@ enum TourFinder {
         return CGRect(x: words.midX - w / 2, y: words.midY - h / 2, width: w, height: h)
     }
 
-    /// The tab bar's n-th tab (0 Today, 1 Courses, …), Search apart.
-    static func tab(_ n: Int, in window: UIWindow, log: Bool) -> CGRect? {
-        let bars = views(UITabBar.self, in: window).filter(shown)
-        guard let bar = bars.first else { return nil }
-        if log { write("tab bar", bar, in: window) }
+    /// The tab bar's n-th tab (0 Today, 1 Courses, …), Search apart: its buttons wherever they are (an iPad's tab bar is
+    /// at the top, and not UIKit's UITabBar), else the one named `label`.
+    static func tab(_ n: Int, named label: String = "Courses", in window: UIWindow, log: Bool) -> CGRect? {
+        guard let root = window.rootViewController?.view else { return nil }
+        if log { writeTabs(root, in: window) }
         var frames: [CGRect] = []
         func walk(_ v: UIView, apart: Bool) {
             for s in v.subviews where !s.isHidden && s.alpha > 0.01 {
                 let kind = name(s)
                 let away = apart || kind.contains("Auxiliary")
-                if kind.contains("TabButton") || kind.contains("TabBarButton") {
+                if kind.contains("TabButton") || kind.contains("TabBarButton") || kind.contains("TabBarItem") {
                     let f = s.convert(s.bounds, to: window)
-                    if !away, TabBarProbe.usable(f), f.width >= 20, !frames.contains(where: { abs($0.midX - f.midX) < 4 && abs($0.midY - f.midY) < 4 }) {
+                    if !away, TabBarProbe.usable(f), f.width >= 20, f.height >= 20, window.bounds.intersects(f),
+                       !frames.contains(where: { abs($0.midX - f.midX) < 4 && abs($0.midY - f.midY) < 4 }) {
                         frames.append(f)
                     }
                     continue
@@ -741,11 +757,59 @@ enum TourFinder {
                 walk(s, apart: away)
             }
         }
-        walk(bar, apart: false)
-        guard !frames.isEmpty else { return nil }
-        let wide = (frames.map(\.maxX).max()! - frames.map(\.minX).min()!) >= (frames.map(\.maxY).max()! - frames.map(\.minY).min()!)
-        let sorted = frames.sorted { wide ? $0.midX < $1.midX : $0.midY < $1.midY }
-        return n < sorted.count ? sorted[n] : nil
+        walk(root, apart: false)
+        if frames.count >= 4 {
+            let wide = (frames.map(\.maxX).max()! - frames.map(\.minX).min()!) >= (frames.map(\.maxY).max()! - frames.map(\.minY).min()!)
+            let sorted = frames.sorted { wide ? $0.midX < $1.midX : $0.midY < $1.midY }
+            if n < sorted.count { return sorted[n] }
+        }
+        return labelled(label, in: root, window: window, edge: true)
+    }
+
+    /// A view named `label` for VoiceOver, button-sized — `edge`: the one nearest the top or bottom of the window.
+    private static func labelled(_ label: String, in root: UIView, window: UIWindow, edge: Bool) -> CGRect? {
+        var found: [CGRect] = []
+        func walk(_ v: UIView) {
+            for s in v.subviews where !s.isHidden && s.alpha > 0.01 {
+                if s.accessibilityLabel?.caseInsensitiveCompare(label) == .orderedSame {
+                    let f = s.convert(s.bounds, to: window)
+                    if TabBarProbe.usable(f), f.width >= 24, f.width <= 240, f.height >= 24, f.height <= 90, window.bounds.intersects(f) { found.append(f) }
+                }
+                walk(s)
+            }
+        }
+        walk(root)
+        let h = window.bounds.height
+        return edge ? found.min { min($0.minY, h - $0.maxY) < min($1.minY, h - $1.maxY) } : found.first
+    }
+
+    /// (The simulator suite) what in the window is a tab, by its kind or its name.
+    private static func writeTabs(_ root: UIView, in window: UIWindow) {
+        var lines: [String] = []
+        func walk(_ v: UIView, _ depth: Int) {
+            guard lines.count < 80 else { return }
+            for s in v.subviews where !s.isHidden && s.alpha > 0.01 {
+                let kind = name(s)
+                if kind.contains("Tab") || s.accessibilityLabel == "Courses" {
+                    let f = s.convert(s.bounds, to: window)
+                    lines.append("\(kind) [\(s.accessibilityLabel ?? "")] \(Int(f.minX)),\(Int(f.minY)) \(Int(f.width))x\(Int(f.height))")
+                }
+                walk(s, depth + 1)
+            }
+        }
+        walk(root, 0)
+        print("[Simpl Courses] tour: tabs\n" + lines.joined(separator: "\n"))
+    }
+
+    /// The button named `label` in the bar over the left column (Courses in two columns: Switch Course).
+    static func named(_ label: String, leftOf edge: CGFloat, in window: UIWindow, log: Bool) -> CGRect? {
+        guard let root = window.rootViewController?.view else { return nil }
+        let bars = navBars(in: root, window: window).filter { $0.1.maxX <= edge + 2 }
+        if log { bars.forEach { write("left bar", $0.0, in: window) } }
+        for (bar, _) in bars {
+            if let f = labelled(label, in: bar, window: window, edge: false) { return f }
+        }
+        return nil
     }
 
     /// The bars on screen, top to bottom, outside any sheet (`in`: inside this view only).

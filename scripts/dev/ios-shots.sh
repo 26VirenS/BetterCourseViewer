@@ -52,7 +52,7 @@ launch() {
 
 # tour <prefix> [args…]: (iPhone 1.9, build 72) the tour after the first setup, gone through by the app itself
 # (-SimplTour drive: Native/Tour.swift) — each step pictured as the app says it is showing, with its ring placed
-# ("tour: shot <name>", then two seconds before the step is done for it), until "tour: done" (two minutes at most).
+# ("tour: shot <name>", then four seconds before the step is done for it), until "tour: done" (three minutes at most).
 # A tour that does not finish is said in tour.txt with its last lines.
 tour() {
   local prefix="$1"
@@ -61,7 +61,10 @@ tour() {
   xcrun simctl terminate booted "$BID" >/dev/null 2>&1 || true
   sleep 0.5
   xcrun simctl launch --console-pty booted "$BID" -SimplBaseURL "${BASE:-http://localhost:8800}" -setupOpened YES -SimplDemo YES -SimplTour drive "$@" > "$log" 2>&1 &
-  while [ $((SECONDS - t0)) -lt 120 ]; do
+  while [ $((SECONDS - t0)) -lt 180 ]; do
+    # (done looked for first: the pictures said before it are all taken before the loop ends)
+    local finished=no
+    grep -q "tour: done" "$log" 2>/dev/null && finished=yes
     local names
     names=$(grep -o "tour: shot [a-z0-9-]*" "$log" 2>/dev/null | awk '{print $3}')
     local n
@@ -73,7 +76,7 @@ tour() {
       xcrun simctl io booted screenshot "$OUT/$name.png" >/dev/null 2>&1 && echo "shot $name" || echo "no shot $name"
       echo "$name $((SECONDS - t0))s tour" >> "$OUT/shot-times.txt"
     done
-    grep -q "tour: done" "$log" 2>/dev/null && break
+    [ "$finished" = yes ] && break
     sleep 0.25
   done
   if ! grep -q "tour: done" "$log"; then
