@@ -1,0 +1,3 @@
+IOSurfaceClientSetSurfaceNotify failed e00002c7
+[Simpl Courses] shot: settled at 8.3 s
+com.simplcourses.app: 70522

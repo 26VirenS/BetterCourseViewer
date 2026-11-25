@@ -1,0 +1,98 @@
+[Simpl Courses] split: list column shown at 416.0 of 890 pt (asked 445.0; share 0.5, ideal -3.4028234663852886e+38, most -3.4028234663852886e+38)
+[Simpl Courses] tour: card
+[Simpl Courses] tour: shot card
+[Simpl Courses] tour: ring 92,180 131x90
+[Simpl Courses] tour: view card at 97,185 121x80
+[Simpl Courses] tour: closeSheet
+[Simpl Courses] tour: shot close
+[Simpl Courses] tour: ring 707,643 104x66
+[Simpl Courses] tour: sheet bar
+_UIBarBackground 226,644 580x64
+NavigationBarContentView 226,654 580x54
+  NavigationBarTransitionContainer 226,654 580x54
+    HostedViewContainer 226,654 580x54
+      HostedViewWrapper 475,665 81x21
+        _UINavigationBarTitleControl 475,665 81x21
+          _UIIntrinsicContentSizeInvalidationForwardingWrapperView 475,665 81x21
+            UILabel 475,665 81x21
+    UIView 226,654 580x54
+    NavigationBarPlatterContainer 226,654 580x54
+      PlatterView 236,654 224x44
+        AnimationView 236,654 224x44
+          AnimationView 236,654 224x44
+            AnimationView 225,651 245x48
+              AnimationView 236,654 224x44
+      PlatterView 722,654 74x44
+        AnimationView 722,654 74x44
+          AnimationView 722,654 74x44
+            AnimationView 718,651 81x48
+              AnimationView 722,654 74x44
+_UIPointerInteractionAssistantEffectContainerView 226,654 0x0
+[Simpl Courses] tour: view card at 97,185 121x80
+[Simpl Courses] tour: view sheetDone at 726,658 66x36
+[Simpl Courses] tour: bar
+[Simpl Courses] tour: shot bar-blue
+[Simpl Courses] tour: shot bar-purple
+[Simpl Courses] tour: shot bar-yellow
+[Simpl Courses] tour: shot bar-red
+[Simpl Courses] tour: shot bar-next
+[Simpl Courses] tour: coursesTab
+[Simpl Courses] tour: shot courses-tab
+[Simpl Courses] tour: ring 397,33 103x42
+[Simpl Courses] tour: tabs
+UIKitPlatformViewHost<PlatformViewRepresentableAdaptor<TabBarProbe>> [] 71,32 890x1324
+UIKitPlatformViewHost<PlatformViewControllerRepresentableAdaptor<UIKitAdaptableTabView>> [] 71,0 890x1376
+_UITabContainerView [] 71,0 890x1376
+_UIFloatingTabBar [] 71,32 890x44
+_UIFloatingTabBarSelectionContainerView [] 317,32 398x44
+_UIFloatingTabBarCollectionView [] 321,32 341x44
+_UIFloatingTabBarItemCell [] 321,36 79x36
+_UIFloatingTabBarItemView [] 321,36 79x36
+_UITabSelectionView [] 321,36 79x36
+_UIFloatingTabBarItemCell [] 400,36 97x36
+_UIFloatingTabBarItemView [] 400,36 97x36
+_UIFloatingTabBarItemCell [] 497,36 77x36
+_UIFloatingTabBarItemView [] 497,36 77x36
+_UIFloatingTabBarItemCell [] 574,36 88x36
+_UIFloatingTabBarItemView [] 574,36 88x36
+_UIFloatingTabBarPinnedItemsView [] 662,32 48x44
+_UIFloatingTabBarItemView [] 662,36 48x36
+_UIFloatingTabBarPageButton [] 290,36 26x36
+_UIFloatingTabBarPageButton [] 715,36 26x36
+[Simpl Courses] tour: view card at 97,185 121x80
+[Simpl Courses] tour: view sheetDone at 500,14 65x36
+[Simpl Courses] tour: firstCourse
+[Simpl Courses] tour: switchCourse
+[Simpl Courses] tour: shot switch-course
+[Simpl Courses] tour: ring 319,92 64x52
+[Simpl Courses] tour: left bar
+_UIBarBackground 81,96 416x106
+NavigationBarLargeTitleView 81,150 416x52
+  _UINavigationBarLargeTitleView 81,150 416x52
+    UILabel 97,153 335x41
+NavigationBarContentView 81,96 416x54
+  NavigationBarTransitionContainer 81,96 416x54
+    HostedViewContainer 81,96 416x54
+    UIView 81,96 416x54
+    NavigationBarPlatterContainer 81,96 416x54
+      PlatterView 323,96 169x44
+        AnimationView 323,96 169x44
+          AnimationView 323,96 169x44
+            AnimationView 315,93 185x48
+              AnimationView 323,96 169x44
+_UIPointerInteractionAssistantEffectContainerView 81,96 0x0
+[Simpl Courses] tour: view course(1) at 97,270 384x80
+[Simpl Courses] tour: view card at 26,185 121x80
+[Simpl Courses] tour: view sheetDone at 500,14 65x36
+[Simpl Courses] tour: view course(0) at 97,190 384x80
+[Simpl Courses] split: list column shown at 416.0 of 890 pt (asked 445.0; share 0.5, ideal -3.4028234663852886e+38, most -3.4028234663852886e+38)
+[Simpl Courses] tour: end
+[Simpl Courses] tour: shot end
+[Simpl Courses] tour: no ring
+[Simpl Courses] tour: view course(1) at 97,270 384x80
+[Simpl Courses] tour: view card at 26,185 121x80
+[Simpl Courses] tour: view sheetDone at 500,14 65x36
+[Simpl Courses] tour: view course(0) at 97,190 384x80
+[Simpl Courses] split: list column shown at 416.0 of 890 pt (asked 445.0; share 0.5, ideal -3.4028234663852886e+38, most -3.4028234663852886e+38)
+[Simpl Courses] tour: done
+com.simplcourses.app: 79619

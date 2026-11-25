@@ -1,0 +1,38 @@
+IOSurfaceClientSetSurfaceNotify failed e00002c7
+[Simpl Courses] split: list column shown at 416.0 of 890 pt (asked 445.0; share 0.5, ideal -3.4028234663852886e+38, most -3.4028234663852886e+38)
+[Simpl Courses] fold cycle: today folded (1)
+[Simpl Courses] fold cycle: today open (1)
+[Simpl Courses] fold cycle: today opened 1 deep
+[Simpl Courses] fold cycle: today folded (2)
+[Simpl Courses] fold cycle: today open (2)
+[Simpl Courses] fold cycle: today folded (3)
+[Simpl Courses] fold cycle: today open (3)
+[Simpl Courses] fold cycle: courses folded (1)
+[Simpl Courses] fold cycle: courses open (1)
+[Simpl Courses] fold cycle: courses opened 1 deep
+[Simpl Courses] split: list column shown at 416.0 of 890 pt (asked 445.0; share 0.5, ideal -3.4028234663852886e+38, most -3.4028234663852886e+38)
+[Simpl Courses] fold cycle: courses folded (2)
+[Simpl Courses] fold cycle: courses open (2)
+2026-11-25 11:10:28.849 Simpl Courses[82125:214355] Unbalanced calls to begin/end appearance transitions for <_TtGC7SwiftUI32NavigationStackHostingControllerVS_7AnyView_: 0x102199c00>.
+[Simpl Courses] fold cycle: courses folded (3)
+[Simpl Courses] fold cycle: courses open (3)
+2026-11-25 11:10:31.873 Simpl Courses[82125:214355] Unbalanced calls to begin/end appearance transitions for <_TtGC7SwiftUI32NavigationStackHostingControllerVS_7AnyView_: 0x102199c00>.
+[Simpl Courses] fold cycle: todo folded (1)
+[Simpl Courses] shot: settled at 47.7 s
+[Simpl Courses] fold cycle: todo open (1)
+[Simpl Courses] fold cycle: todo opened 1 deep
+[Simpl Courses] split: list column shown at 416.0 of 890 pt (asked 445.0; share 0.5, ideal -3.4028234663852886e+38, most -3.4028234663852886e+38)
+[Simpl Courses] fold cycle: todo folded (2)
+[Simpl Courses] fold cycle: todo open (2)
+[Simpl Courses] fold cycle: todo folded (3)
+[Simpl Courses] fold cycle: todo open (3)
+[Simpl Courses] fold cycle: grades folded (1)
+[Simpl Courses] fold cycle: grades open (1)
+[Simpl Courses] fold cycle: grades opened 1 deep
+[Simpl Courses] split: list column shown at 416.0 of 890 pt (asked 445.0; share 0.5, ideal -3.4028234663852886e+38, most -3.4028234663852886e+38)
+[Simpl Courses] fold cycle: grades folded (2)
+[Simpl Courses] fold cycle: grades open (2)
+[Simpl Courses] fold cycle: grades folded (3)
+[Simpl Courses] fold cycle: grades open (3)
+[Simpl Courses] fold cycle: done
+com.simplcourses.app: 82125

@@ -1,0 +1,964 @@
+getpwuid_r did not find a match for uid 501
+Timestamp               Ty Process[PID:TID]
+2026-11-25 10:40:04.679 Df runningboardd[2389:db8f] [com.apple.runningboard:job_oversize] 'app<com.simplcourses.app((null))>' Constructed job description:
+<dictionary: 0x60000262cb40> { count = 21, transaction: 0, voucher = 0x0, contents =
+	"ProcessType" => <string: 0x600000c64fc0> { string cache = 0x0, length = 3, contents = "App" }
+	"EnableTransactions" => <bool: 0x1e5760410>: false
+	"_ManagedBy" => <string: 0x600000c65110> { string cache = 0x0, length = 22, contents = "com.apple.runningboard" }
+	"RootedSimulatorPath" => <bool: 0x1e57603f0>: true
+	"StandardOutPath" => <string: 0x600000c65290> { string cache = 0x0, length = 12, contents = "/dev/ttys000" }
+	"CFBundleIdentifier" => <string: 0x600000c64ff0> { string cache = 0x0, length = 20, contents = "com.simplcourses.app" }
+	"_ResourceCoalition" => <string: 0x600000c650b0> { string cache = 0x0, length = 33, contents = "app<com.simplcourses.app((null))>" }
+	"ThrottleInterval" => <int64: 0x86087fb43ec31acf>: 2147483647
+	"StandardErrorPath" => <string: 0x600000c652c0> { string cache = 0x0, length = 12, contents = "/dev/ttys000" }
+	"MachServices" => <dictionary: 0x60000262d740> { count = 0, transaction: 0, voucher = 0x0, contents =
+	}
+	"EnablePressuredExit" => <bool: 0x1e5760410>: false
+	"InitialTaskRole" => <int64: 0x86087fb7c13ce53f>: 1
+	"UserName" => <string: 0x600000c65080> { string cache = 0x0, length = 6, contents = "mobile" }
+	"EnvironmentVariables" => <dictionary: 0x60000262ca80> { count = 3, transaction: 0, voucher = 0x0, contents =
+		"TMPDIR" => <string: 0x600000c64f60> { string cache = 0x0, length = 164, contents = "/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Data/Application/8A8194C1-5615-4C71-986F-6297C115D456/tmp" }
+		"HOME" => <string: 0x600000c651d0> { string cache = 0x0, length = 160, contents = "/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Data/Application/8A8194C1-5615-4C71-986F-6297C115D456" }
+		"CFFIXED_USER_HOME" => <string: 0x600000c64f00> { string cache = 0x0, length = 160, contents = "/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Data/Application/8A8194C1-5615-4C71-986F-6297C115D456" }
+	}
+	"_AdditionalProperties" => <dictionary: 0x60000262d800> { count = 1, transaction: 0, voucher = 0x0, contents =
+		"RunningBoard" => <dictionary: 0x60000262d140> { count = 3, transaction: 0, voucher = 0x0, contents =
+			"Managed" => <bool: 0x1e57603f0>: true
+			"RunningBoardLaunchedIdentity" => <dictionary: 0x60000262d7a0> { count = 2, transaction: 0, voucher = 0x0, contents =
+				"TYPE" => <int64: 0x86087fb7c13ce527>: 2
+				"EAI" => <string: 0x600000c64ed0> { string cache = 0x0, length = 20, contents = "com.simplcourses.app" }
+			}
+			"RunningBoardLaunched" => <bool: 0x1e57603f0>: true
+		}
+	}
+	"ExitTimeOut" => <int64: 0x86087fb7c13ce53f>: 1
+	"Label" => <string: 0x600000c65020> { string cache = 0x0, length = 54, contents = "UIKitApplication:com.simplcourses.app[457f][rb-legacy]" }
+	"MaterializeDatalessFiles" => <bool: 0x1e57603f0>: true
+	"_LaunchType" => <int64: 0x86087fb7c13ce52f>: 3
+	"ProgramArguments" => <array: 0x600000c65140> { count = 9, capacity = 16, contents =
+		0: <string: 0x600000c648d0> { string cache = 0x0, length = 194, contents = "/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Bundle/Application/76ABBBE3-F9BE-4E75-8F8D-3ACC54164C11/Simpl Courses.app/Simpl Courses" }
+		1: <string: 0x600000c64db0> { string cache = 0x0, length = 13, contents = "-SimplBaseURL" }
+		2: <string: 0x600000c64e10> { string cache = 0x0, length = 21, contents = "http://localhost:8800" }
+		3: <string: 0x600000c649f0> { string cache = 0x0, length = 12, contents = "-setupOpened" }
+		4: <string: 0x600000c64c60> { string cache = 0x0, length = 3, contents = "YES" }
+		5: <string: 0x600000c64d20> { string cache = 0x0, length = 10, contents = "-SimplDemo" }
+		6: <string: 0x600000c64ea0> { string cache = 0x0, length = 3, contents = "YES" }
+		7: <string: 0x600000c64e70> { string cache = 0x0, length = 16, contents = "-SimplShotSettle" }
+		8: <string: 0x600000c65230> { string cache = 0x0, length = 3, contents = "YES" }
+	}
+	"Program" => <string: 0x600000c64de0> { string cache = 0x0, length = 194, contents = "/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Bundle/Application/76ABBBE3-F9BE-4E75-8F8D-3ACC54164C11/Simpl Courses.app/Simpl Courses" }
+}
+2026-11-25 10:40:04.828 Df launchd_sim[2298:df8d] [user/501/UIKitApplication:com.simplcourses.app[457f][rb-legacy] [20323]:] Successfully spawned Simpl Courses[20323] because launch job demand
+2026-11-25 10:40:04.840 Df CoreSimulatorBridge[2417:3773] [com.apple.FrontBoard:Common] [FBSSystemService][0x1655] Request successful: <BSProcessHandle: 0x600000c099b0; Simpl Courses:20323; valid: YES>
+2026-11-25 10:40:06.186 Df Simpl Courses[20323:e793] [com.apple.xpc:connection] [0x101105190] activating connection: mach=true listener=false peer=false name=com.apple.cfprefsd.daemon
+2026-11-25 10:40:06.219 Df Simpl Courses[20323:e793] [com.apple.xpc:connection] [0x101105d40] activating connection: mach=true listener=false peer=false name=com.apple.metrickit.xpc
+2026-11-25 10:40:06.219 Df launchd_sim[2298:e4fe] [user/501:] failed lookup: name = com.apple.metrickit.xpc, requestor = Simpl Courses[20323], error = 3: No such process
+2026-11-25 10:40:06.219 Df Simpl Courses[20323:e793] [com.apple.xpc:connection] [0x101105d40] failed to do a bootstrap look-up: xpc_error=[3: No such process]
+2026-11-25 10:40:06.219 Df Simpl Courses[20323:e793] [com.apple.xpc:connection] [0x101105d40] invalidated after a failed init
+2026-11-25 10:40:06.222 Df Simpl Courses[20323:e793] [com.apple.UserNotifications:Connections] [com.simplcourses.app] Creating a user notification center
+2026-11-25 10:40:06.320 Df Simpl Courses[20323:e793] [com.apple.runningboard:connection] Initializing connection
+2026-11-25 10:40:06.320 Df Simpl Courses[20323:e793] [com.apple.runningboard:process] Removing all cached process handles
+2026-11-25 10:40:06.320 Df Simpl Courses[20323:e7a8] [com.apple.runningboard:connection] Sending handshake request attempt #1 to server
+2026-11-25 10:40:06.320 Df Simpl Courses[20323:e7a8] [com.apple.runningboard:connection] Creating connection to com.apple.runningboard
+2026-11-25 10:40:06.320 Df Simpl Courses[20323:e7a8] [com.apple.xpc:connection] [0x100d05780] activating connection: mach=true listener=false peer=false name=com.apple.runningboard
+2026-11-25 10:40:06.321 A  Simpl Courses[20323:e7a9] (RunningBoardServices) didChangeInheritances
+2026-11-25 10:40:06.322 Df Simpl Courses[20323:e7a8] [com.apple.runningboard:connection] Handshake succeeded
+2026-11-25 10:40:06.322 Df Simpl Courses[20323:e7a8] [com.apple.runningboard:connection] Identity resolved as app<com.simplcourses.app((null))>
+2026-11-25 10:40:06.324 A  Simpl Courses[20323:e7ab] (CoreFoundation) Loading Preferences From User Session CFPrefsD
+2026-11-25 10:40:06.325 Df Simpl Courses[20323:e793] (libMobileGestalt.dylib) No persisted cache on this platform.
+2026-11-25 10:40:06.327 Df backboardd[2408:e731] [com.apple.iohid:default] Connection added: IOHIDEventSystemConnection uuid:BFCB4063-60AA-433E-A687-57189EB3B52D pid:20323 process:Simpl Courses type:Passive entitlements:0x0 caller:BackBoardServices: ___getHIDEventSystemClient_block_invoke + 276 attributes:{
+    HighFrequency = 0;
+    bundleID = "com.simplcourses.app";
+    pid = 20323;
+} state:0x0 events:0 mask:0x0 dropped:0 dropStatus:0 droppedMask:0x0 lastDroppedTime:NONE
+2026-11-25 10:40:06.328 Df backboardd[2408:e731] [com.apple.BackBoard:HID] Adding client connection: <BKHIDClientConnection: 0x600001751c80; IOHIDEventSystemConnectionRef: 0x102c1aad0; vpid: 20323(vA219); taskPort: 0x20C57; bundleID: com.simplcourses.app> for client: IOHIDEventSystemConnection uuid:BFCB4063-60AA-433E-A687-57189EB3B52D pid:20323 process:Simpl Courses type:Passive entitlements:0x0 caller:BackBoardServices: ___getHIDEventSystemClient_block_invoke + 276 attributes:{
+    HighFrequency = 0;
+    bundleID = "com.simplcourses.app";
+    pid = 20323;
+} state:0x0 events:0 mask:0x0 dropped:0 dropStatus:0 droppedMask:0x0 lastDroppedTime:NONE
+2026-11-25 10:40:06.329 Df Simpl Courses[20323:e7a8] [com.apple.BoardServices:XPCErrors] [C:1] Alloc com.apple.frontboard.systemappservices
+2026-11-25 10:40:06.330 Df Simpl Courses[20323:e7a8] [com.apple.xpc:connection] [0x101207090] activating connection: mach=false listener=false peer=false name=(anonymous)
+2026-11-25 10:40:06.330 Df Simpl Courses[20323:e7a9] [com.apple.UIKit:BackgroundTask] Creating new assertion because there is no existing background assertion.
+2026-11-25 10:40:06.331 Df Simpl Courses[20323:e7a9] [com.apple.UIKit:BackgroundTask] Creating new background assertion
+2026-11-25 10:40:06.331 Df Simpl Courses[20323:e7a9] [com.apple.UIKit:BackgroundTask] Created new background assertion <BKSProcessAssertion: 0x600002104f00>
+2026-11-25 10:40:06.349 Df Simpl Courses[20323:e7a9] [com.apple.UIKit:BackgroundTask] Incrementing reference count for background assertion <BKSProcessAssertion: 0x600002104f00>
+2026-11-25 10:40:06.350 Df Simpl Courses[20323:e7a9] [com.apple.UIKit:BackgroundTask] Created background task <_UIBackgroundTaskInfo: 0x600001704700>: taskID = 1, taskName = Launch Background Task for Coalescing, creationTime = 858 (elapsed = 0).
+2026-11-25 10:40:06.350 Df Simpl Courses[20323:e7a9] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UIApplicationSceneKeyboardSettings on FBSSceneSettings
+2026-11-25 10:40:06.353 Df Simpl Courses[20323:e7a9] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneOcclusionSettings> on FBSSceneSettings
+2026-11-25 10:40:06.354 Df Simpl Courses[20323:e7a9] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneInterfaceProtectionSettings> on FBSSceneSettings
+2026-11-25 10:40:06.356 Df Simpl Courses[20323:e7a9] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UISceneLayoutPreferencesHostSettingsExtension on FBSSceneSettings
+2026-11-25 10:40:06.356 Df Simpl Courses[20323:e793] [com.apple.UIKit:Application] Deactivation reason added: 10; deactivation reasons: 0 -> 1024; animating application lifecycle event: 0
+2026-11-25 10:40:06.357 Df Simpl Courses[20323:e7a9] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UISceneSafeAreaSettingsExtension on FBSSceneSettings
+2026-11-25 10:40:06.357 Df Simpl Courses[20323:e793] [com.apple.BoardServices:Injection] activating monitor for service com.apple.frontboard.open
+2026-11-25 10:40:06.358 Df Simpl Courses[20323:e793] [com.apple.BoardServices:Injection] activating monitor for service com.apple.frontboard.workspace-service
+2026-11-25 10:40:06.358 Df Simpl Courses[20323:e7a9] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UISceneLayoutPreferenceClientSettingsExtension on FBSSceneClientSettings
+2026-11-25 10:40:06.359 Df Simpl Courses[20323:e793] [com.apple.FrontBoard:Common] FBSWorkspace registering source: com.apple.frontboard.systemappservices
+2026-11-25 10:40:06.359 Df Simpl Courses[20323:e7a9] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UIHomeAffordanceHostSceneSettings> on FBSSceneSettings
+2026-11-25 10:40:06.359 Df Simpl Courses[20323:e7a9] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UISystemShellSceneHostingEnvironmentSettings on FBSSceneSettings
+2026-11-25 10:40:06.359 Df Simpl Courses[20323:e7a9] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UISceneRenderingEnvironmentSettings on FBSSceneSettings
+2026-11-25 10:40:06.360 Df Simpl Courses[20323:e7a9] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneRenderingEnvironmentClientSettings> on FBSSceneClientSettings
+2026-11-25 10:40:06.360 Df Simpl Courses[20323:e7a9] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneTransitioningHostSettings> on FBSSceneSettings
+2026-11-25 10:40:06.360 Df Simpl Courses[20323:e7a9] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneFocusSystemSettings> on FBSSceneSettings
+2026-11-25 10:40:06.360 Df Simpl Courses[20323:e7a9] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UISceneOrientationSettingsExtension on FBSSceneSettings
+2026-11-25 10:40:06.360 Df Simpl Courses[20323:e7a9] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UISceneOrientationClientSettingsExtension on FBSSceneClientSettings
+2026-11-25 10:40:06.361 Df Simpl Courses[20323:e7a9] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UISceneWindowingControlClientSettings on FBSSceneClientSettings
+2026-11-25 10:40:06.361 Df Simpl Courses[20323:e793] [com.apple.FrontBoard:Common] FBSWorkspace connected to endpoint : <BSServiceConnectionEndpoint: 0x60000020f740; target: com.apple.frontboard.systemappservices; service: com.apple.frontboard.workspace-service>
+2026-11-25 10:40:06.361 Df Simpl Courses[20323:e793] [com.apple.FrontBoard:Common] <FBSWorkspaceScenesClient:0x600003004360 com.apple.frontboard.systemappservices> attempting immediate handshake from activate
+2026-11-25 10:40:06.361 Df Simpl Courses[20323:e793] [com.apple.FrontBoard:Common] <FBSWorkspaceScenesClient:0x600003004360 com.apple.frontboard.systemappservices> sent handshake
+2026-11-25 10:40:06.362 Df Simpl Courses[20323:e793] [com.apple.runningboard:general] Added observer for process assertions expiration warning: <_RBSExpirationWarningClient: 0x600000212580>
+2026-11-25 10:40:06.362 Df Simpl Courses[20323:e7a9] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneHostingContentSizePreferenceClientSettings> on FBSSceneClientSettings
+2026-11-25 10:40:06.363 Df Simpl Courses[20323:e7a9] [com.apple.FrontBoard:SceneExtension] Realizing settings extension _UISceneHostingTraitCollectionPropagationSettings on FBSSceneSettings
+2026-11-25 10:40:06.365 Df Simpl Courses[20323:e7a9] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneHostingSheetPresentationSettings> on FBSSceneSettings
+2026-11-25 10:40:06.365 Df Simpl Courses[20323:e7a9] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneHostingSheetPresentationClientSettings> on FBSSceneClientSettings
+2026-11-25 10:40:06.366 Df Simpl Courses[20323:e793] [com.apple.UIKit:UIScreen] Evaluated capturing state as 0 on <UIScreen: 0x101207950> for initial
+2026-11-25 10:40:06.366 Df Simpl Courses[20323:e7a9] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneHostingEventDeferringSettings> on FBSSceneSettings
+2026-11-25 10:40:06.366 Df Simpl Courses[20323:e793] [com.apple.UIKit:UIScreen] Evaluated capturing state as 0 on <UIScreen: 0x101207950> for CADisplay KVO
+2026-11-25 10:40:06.367 Df Simpl Courses[20323:e7a9] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <UIKit__UITypedKeyValueSceneSettings> on FBSSceneSettings
+2026-11-25 10:40:06.368 Df Simpl Courses[20323:e7a9] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <UIKit__UITypedKeyValueSceneSettings> on FBSSceneClientSettings
+2026-11-25 10:40:06.368 Df Simpl Courses[20323:e793] [com.apple.Accessibility:AXSupportCommon] Read CategoryName: per-app = 1, category name = (null)
+2026-11-25 10:40:06.369 Df Simpl Courses[20323:e7a9] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneHostingViewControllerPreferencePropagationClientSettings> on FBSSceneClientSettings
+2026-11-25 10:40:06.369 Df Simpl Courses[20323:e793] [com.apple.Accessibility:AXSupportCommon] Read CategoryName: per-app = 0, category name = (null)
+2026-11-25 10:40:06.369 Df Simpl Courses[20323:e7a9] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneZoomTransitionSettings> on FBSSceneSettings
+2026-11-25 10:40:06.370 Df Simpl Courses[20323:e7ab] [com.apple.FrontBoard:SceneExtension] Realizing settings extension FBSSceneSettingsCore on FBSSceneSettings
+2026-11-25 10:40:06.373 Df Simpl Courses[20323:e7ab] [com.apple.FrontBoard:SceneExtension] Realizing settings extension FBSSceneClientSettingsCore on FBSSceneClientSettings
+2026-11-25 10:40:06.380 Df Simpl Courses[20323:e793] [com.apple.dt.xctest:Default] Registering for test daemon availability notify post.
+2026-11-25 10:40:06.381 Df Simpl Courses[20323:e793] [com.apple.dt.xctest:Default] notify_get_state check indicated test daemon not ready.
+2026-11-25 10:40:06.382 Df Simpl Courses[20323:e793] [com.apple.dt.xctest:Default] notify_get_state check indicated test daemon not ready.
+2026-11-25 10:40:06.382 Df Simpl Courses[20323:e793] [com.apple.dt.xctest:Default] notify_get_state check indicated test daemon not ready.
+2026-11-25 10:40:06.383 Df Simpl Courses[20323:e793] [com.apple.UIKit:Application] Deactivation reason added: 11; deactivation reasons: 1024 -> 3072; animating application lifecycle event: 0
+2026-11-25 10:40:06.385 Df Simpl Courses[20323:e793] [com.apple.UIKit:Application] Deactivation reason removed: 10; deactivation reasons: 3072 -> 2048; animating application lifecycle event: 0
+2026-11-25 10:40:06.386 Df Simpl Courses[20323:e7ab] [com.apple.FrontBoard:SceneExtension] UIMutableApplicationSceneSettings setting counterpart class: UIApplicationSceneSettings
+2026-11-25 10:40:06.386 Df Simpl Courses[20323:e793] [com.apple.UIKit:EventBus] Event Timing Profile for Touch: not found, path="/System/Library/EventTimingProfiles/Sim.Touch.plist"
+2026-11-25 10:40:06.386 Df Simpl Courses[20323:e793] [com.apple.UIKit:EventBus] Event Timing Profile for Pencil: not found, path="/System/Library/EventTimingProfiles/Sim.Pencil.plist"
+2026-11-25 10:40:06.386 Df Simpl Courses[20323:e793] [com.apple.UIKit:UpdateScheduler] Selected display: name=LCD (PurpleMain), id=1
+2026-11-25 10:40:06.386 Df Simpl Courses[20323:e7ab] [com.apple.FrontBoard:SceneExtension] UIMutableApplicationSceneClientSettings setting counterpart class: UIApplicationSceneClientSettings
+2026-11-25 10:40:06.386 Df Simpl Courses[20323:e7ab] [com.apple.FrontBoard:SceneExtension] Realizing settings extension FBSSceneTransitionContextCore on FBSSceneTransitionContext
+2026-11-25 10:40:06.388 Df Simpl Courses[20323:e793] [com.apple.xpc:connection] [0x101209040] activating connection: mach=true listener=false peer=false name=com.apple.lsd.mapdb
+2026-11-25 10:40:06.459 Df Simpl Courses[20323:e793] [com.apple.BoardServices:XPCErrors] [C:2] Alloc com.apple.backboard.hid-services.xpc
+2026-11-25 10:40:06.459 Df Simpl Courses[20323:e793] [com.apple.xpc:connection] [0x10120a1d0] activating connection: mach=false listener=false peer=false name=(anonymous)
+2026-11-25 10:40:06.460 Df Simpl Courses[20323:e7a9] [com.apple.BackBoard:EventDelivery] BKSHIDEventDeliveryManager - connection activation
+2026-11-25 10:40:06.466 Df Simpl Courses[20323:e793] [com.apple.UIKit:BackgroundTask] Will add backgroundTask with taskName: Persistent SceneSession Map Update, expirationHandler: <__NSGlobalBlock__: 0x1e61729e0>
+2026-11-25 10:40:06.466 Df Simpl Courses[20323:e793] [com.apple.UIKit:BackgroundTask] Reusing background assertion <BKSProcessAssertion: 0x600002104f00>
+2026-11-25 10:40:06.466 Df Simpl Courses[20323:e793] [com.apple.UIKit:BackgroundTask] Incrementing reference count for background assertion <BKSProcessAssertion: 0x600002104f00>
+2026-11-25 10:40:06.466 Df Simpl Courses[20323:e793] [com.apple.UIKit:BackgroundTask] Created background task <_UIBackgroundTaskInfo: 0x600001713880>: taskID = 2, taskName = Persistent SceneSession Map Update, creationTime = 858 (elapsed = 0).
+2026-11-25 10:40:06.466 Df Simpl Courses[20323:e793] [com.apple.UIKit:Application] Deactivation reason added: 5; deactivation reasons: 2048 -> 2080; animating application lifecycle event: 1
+2026-11-25 10:40:06.466 Df Simpl Courses[20323:e793] [com.apple.UIKit:InterfaceStyle] Should send trait collection or coordinate space update, interface style 1 -> 1, <UIWindowScene: 0x101105740> (7A218B54-9DBB-4981-892D-297E11963F16)
+2026-11-25 10:40:06.467 Df Simpl Courses[20323:e793] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x101105740> (7A218B54-9DBB-4981-892D-297E11963F16)
+2026-11-25 10:40:06.468 Df Simpl Courses[20323:e793] [com.apple.UIKit:HomeAffordanceObservation] Initializing: <_UIHomeAffordanceSceneNotifier: 0x6000029156c0>; with scene: <UIWindowScene: 0x101105740>
+2026-11-25 10:40:06.468 Df Simpl Courses[20323:e793] [com.apple.BacklightServices:scenes] 0x600000c1e940 setDelegate:<0x600000c1eb20 _UIBacklightEnvironment> hasDelegate:YES for environment:sceneID:com.simplcourses.app-default
+2026-11-25 10:40:06.469 Df Simpl Courses[20323:e793] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x101105740> (7A218B54-9DBB-4981-892D-297E11963F16)
+2026-11-25 10:40:06.469 Df Simpl Courses[20323:e793] [com.apple.UIKit:EventDeferring] [0x600002916680] Initialized with scene: <UIWindowScene: 0x101105740>; behavior: <_UIEventDeferringBehavior_iOS: 0x600000222c40>; availableForProcess: 1, systemShellManagesKeyboardFocus: 1
+2026-11-25 10:40:06.470 Df Simpl Courses[20323:e7a8] [com.apple.BackBoard:EventDelivery] BKSHIDEventObserver - connection activation
+2026-11-25 10:40:06.470 Df Simpl Courses[20323:e793] [com.apple.BackBoard:EventDelivery] policyStatus:<BKSHIDEventDeliveryPolicyObserver: 0x600002606220; process scope; status: target> was:none
+2026-11-25 10:40:06.470 Df Simpl Courses[20323:e793] [com.apple.UIKit:KeyWindow] Setting default evaluation strategy for UIUserInterfaceIdiomPhone to LastOneWins
+2026-11-25 10:40:06.470 Df Simpl Courses[20323:e793] [com.apple.UIKit:KeyWindow] Scene target of keyboard event deferring environment did change: 1; scene: UIWindowScene: 0x101105740; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.simplcourses.app-default
+2026-11-25 10:40:06.470 Df Simpl Courses[20323:e793] [com.apple.UIKit:EventDeferring] [0x600002916680] Scene target of event deferring environments did update: scene: 0x101105740; current systemShellManagesKeyboardFocus: 1; systemShellManagesKeyboardFocusForScene: 1; eligibleForRecordRemoval: 1;
+2026-11-25 10:40:06.470 Df Simpl Courses[20323:e793] [com.apple.UIKit:KeyWindow] Scene became target of keyboard event deferring environment: UIWindowScene: 0x101105740; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.simplcourses.app-default
+2026-11-25 10:40:06.471 Df Simpl Courses[20323:e793] [com.apple.UIKit:KeyWindow] Stack[KeyWindow] 0x600000c14420: Taking no further action for migration from LastOneWins -> SystemShellManaged as there are no scenes
+2026-11-25 10:40:06.471 Df Simpl Courses[20323:e793] [com.apple.UIKit:KeyWindow] Setting default evaluation strategy for UIUserInterfaceIdiomPhone to SystemShellManaged
+2026-11-25 10:40:06.471 Df Simpl Courses[20323:e793] [com.apple.UIKit:KeyWindow] Key window needs update: 0; currentKeyWindowScene: 0x0; evaluatedKeyWindowScene: 0x101105740; currentApplicationKeyWindow: 0x0; evaluatedApplicationKeyWindow: 0x0; reason: UIWindowScene: 0x101105740: Window scene became target of keyboard environment
+2026-11-25 10:40:06.472 Df Simpl Courses[20323:e793] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x101105740> (7A218B54-9DBB-4981-892D-297E11963F16)
+2026-11-25 10:40:06.472 Df Simpl Courses[20323:e793] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x101105740> (7A218B54-9DBB-4981-892D-297E11963F16)
+2026-11-25 10:40:06.473 Df Simpl Courses[20323:e793] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x101105740> (7A218B54-9DBB-4981-892D-297E11963F16)
+2026-11-25 10:40:06.594 Df Simpl Courses[20323:e793] [com.apple.UIKit:Orientation] <UIWindowScene: 0x101105740> (7A218B54-9DBB-4981-892D-297E11963F16) Scene updated orientation preferences: none -> ( Pu Ll Lr )
+2026-11-25 10:40:06.598 Df Simpl Courses[20323:e793] [com.apple.UIKit:KeyWindow] Key window API is scene-level: YES
+2026-11-25 10:40:06.598 Df Simpl Courses[20323:e793] [com.apple.UIKit:KeyWindow] UIWindowScene: 0x101105740: Window became key in scene: UIWindow: 0x100d0d140; contextId: 0xC0CEEE7: reason: UIWindowScene: 0x101105740: Window requested to become key in scene: 0x100d0d140
+2026-11-25 10:40:06.598 Df Simpl Courses[20323:e793] [com.apple.UIKit:KeyWindow] Key window needs update: 1; currentKeyWindowScene: 0x0; evaluatedKeyWindowScene: 0x101105740; currentApplicationKeyWindow: 0x0; evaluatedApplicationKeyWindow: 0x100d0d140; reason: UIWindowScene: 0x101105740: Window requested to become key in scene: 0x100d0d140
+2026-11-25 10:40:06.598 Df Simpl Courses[20323:e793] [com.apple.UIKit:KeyWindow] Window did become application key: UIWindow: 0x100d0d140; contextId: 0xC0CEEE7; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.simplcourses.app-default
+2026-11-25 10:40:06.598 Df Simpl Courses[20323:e793] [com.apple.UIKit:EventDeferring] [0x600002916680] Begin local event deferring requested for token: 0x60000260ca80; environments: 1; reason: UIWindowScene: 0x101105740: Begin event deferring in keyboardFocus for window: 0x100d0d140
+2026-11-25 10:40:06.599 Df Simpl Courses[20323:e7a9] [com.apple.BackBoard:EventDelivery] policyStatus:<BKSHIDEventDeliveryPolicyObserver: 0x600002606220; token: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.simplcourses.app-default; status: ancestor> was:target
+2026-11-25 10:40:06.600 Df Simpl Courses[20323:e793] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x101105740> (7A218B54-9DBB-4981-892D-297E11963F16)
+2026-11-25 10:40:06.601 Df Simpl Courses[20323:e793] [com.apple.UIKit:AppLifecycle] sceneOfRecord: sceneID: sceneID:com.simplcourses.app-default  persistentID: 7A218B54-9DBB-4981-892D-297E11963F16
+2026-11-25 10:40:06.601 Df Simpl Courses[20323:e793] [com.apple.UIKit:Application] Ignoring already applied deactivation reason: 5; deactivation reasons: 2080
+2026-11-25 10:40:06.601 Df Simpl Courses[20323:e793] [com.apple.UIKit:Application] Deactivation reason added: 12; deactivation reasons: 2080 -> 6176; animating application lifecycle event: 1
+2026-11-25 10:40:06.601 Df Simpl Courses[20323:e793] [com.apple.UIKit:Application] Deactivation reason removed: 11; deactivation reasons: 6176 -> 4128; animating application lifecycle event: 1
+2026-11-25 10:40:06.601 Df Simpl Courses[20323:e793] [com.apple.FrontBoard:SceneExtension] Realizing settings extension <_UISceneIntelligenceSupportSettings> on FBSSceneSettings
+2026-11-25 10:40:06.602 Df Simpl Courses[20323:e793] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x101105740> (7A218B54-9DBB-4981-892D-297E11963F16)
+2026-11-25 10:40:06.603 Df Simpl Courses[20323:e7a9] [com.apple.UIIntelligenceSupport:xpc] establishing connection to agent
+2026-11-25 10:40:06.604 Df Simpl Courses[20323:e7a9] [com.apple.xpc:session] [0x6000021137f0] Session created.
+2026-11-25 10:40:06.604 Df Simpl Courses[20323:e7a9] [com.apple.xpc:session] [0x6000021137f0] Session created from connection [0x10110ceb0]
+2026-11-25 10:40:06.604 Df Simpl Courses[20323:e7a9] [com.apple.xpc:connection] [0x10110ceb0] activating connection: mach=true listener=false peer=false name=com.apple.uiintelligencesupport.agent
+2026-11-25 10:40:06.604 Df Simpl Courses[20323:e7a9] [com.apple.xpc:session] [0x6000021137f0] Session activated
+2026-11-25 10:40:06.611 A  Simpl Courses[20323:e793] (CoreFoundation) Updating Key-Value Observers Of Preferences
+2026-11-25 10:40:06.835 Df Simpl Courses[20323:e793] (WebKit) 0x100d11028 - WebsiteDataStore::WebsiteDataStore sessionID=1 identifier=null
+2026-11-25 10:40:06.855 A  Simpl Courses[20323:e7a8] (libsystem_containermanager.dylib) container_system_group_path_for_identifier
+2026-11-25 10:40:06.855 Df Simpl Courses[20323:e7a8] [com.apple.containermanager:xpc] Requesting container lookup; class = 13, identifier = (null), group_identifier = systemgroup.com.apple.configurationprofiles, create = 1, temp = 0, euid = 501, uid = 501
+2026-11-25 10:40:06.855 A  Simpl Courses[20323:e7a8] (libsystem_containermanager.dylib) container_query_t
+2026-11-25 10:40:06.855 Df Simpl Courses[20323:e7a8] [com.apple.containermanager:xpc] Query; euid = 501, uid = 501, class = 13, identifier = [(null)](0), flags = 900000003
+2026-11-25 10:40:06.889 Df Simpl Courses[20323:e7a8] [com.apple.containermanager:unspecified] _container_query_get_result_at_index: success
+2026-11-25 10:40:06.889 A  Simpl Courses[20323:e7a8] (libsystem_containermanager.dylib) container_copy_object
+2026-11-25 10:40:06.889 Df Simpl Courses[20323:e7a8] [com.apple.containermanager:unspecified] container_system_group_path_for_identifier: success
+2026-11-25 10:40:06.889 Df Simpl Courses[20323:e7a8] [com.apple.ManagedConfiguration:MC] Got system group container path from MCM for systemgroup.com.apple.configurationprofiles: /Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Shared/SystemGroup/systemgroup.com.apple.configurationprofiles
+2026-11-25 10:40:06.982 Df Simpl Courses[20323:e7a8] [com.apple.UIKit:BackgroundTask] Ending background task with UIBackgroundTaskIdentifier: 2
+2026-11-25 10:40:06.983 Df Simpl Courses[20323:e7a8] [com.apple.UIKit:BackgroundTask] Ending task with identifier 2 and description: <_UIBackgroundTaskInfo: 0x600001713880>: taskID = 2, taskName = Persistent SceneSession Map Update, creationTime = 858 (elapsed = 0), _expireHandler: <__NSGlobalBlock__: 0x1e61729e0>
+2026-11-25 10:40:06.983 Df Simpl Courses[20323:e7a8] [com.apple.UIKit:BackgroundTask] Decrementing reference count for assertion <BKSProcessAssertion: 0x600002104f00> (used by background task with identifier 2: <_UIBackgroundTaskInfo: 0x600001713880>: taskID = 2, taskName = Persistent SceneSession Map Update, creationTime = 858 (elapsed = 0))
+2026-11-25 10:40:07.051 A  Simpl Courses[20323:e793] (TCC) TCCAccessRequest() IPC
+2026-11-25 10:40:07.051 Df Simpl Courses[20323:e793] [com.apple.xpc:connection] [0x101212290] activating connection: mach=true listener=false peer=false name=com.apple.tccd
+2026-11-25 10:40:07.052 Df tccd[2398:daa7] [com.apple.TCC:access] AUTHREQ_ATTRIBUTION: msgID=20323.1, attribution={requesting={TCCDProcess: identifier=Simpl Courses, pid=20323, auid=501, euid=501, binary_path=/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Bundle/Application/76ABBBE3-F9BE-4E75-8F8D-3ACC54164C11/Simpl Courses.app/Simpl Courses}, },
+2026-11-25 10:40:07.073 Df Simpl Courses[20323:e793] [com.apple.xpc:connection] [0x101212290] invalidated after the last release of the connection object
+2026-11-25 10:40:07.076 A  Simpl Courses[20323:e793] (TCC) TCCAccessRequest() IPC
+2026-11-25 10:40:07.077 Df Simpl Courses[20323:e793] [com.apple.xpc:connection] [0x10110f7a0] activating connection: mach=true listener=false peer=false name=com.apple.tccd
+2026-11-25 10:40:07.077 Df tccd[2398:e590] [com.apple.TCC:access] AUTHREQ_ATTRIBUTION: msgID=20323.2, attribution={requesting={TCCDProcess: identifier=Simpl Courses, pid=20323, auid=501, euid=501, binary_path=/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Bundle/Application/76ABBBE3-F9BE-4E75-8F8D-3ACC54164C11/Simpl Courses.app/Simpl Courses}, },
+2026-11-25 10:40:07.079 Df Simpl Courses[20323:e793] [com.apple.xpc:connection] [0x10110f7a0] invalidated after the last release of the connection object
+2026-11-25 10:40:07.098 Df Simpl Courses[20323:e793] (WebKit) 0x1110b40e0 - [PID=0] WebProcessCache::updateCapacity: Cache is disabled because process swap on navigation is disabled
+2026-11-25 10:40:07.118 Df Simpl Courses[20323:e793] (libMobileGestalt.dylib) No persisted cache on this platform.
+2026-11-25 10:40:07.170 Df Simpl Courses[20323:e7ae] [com.apple.xpc:connection] [0x10120f860] activating connection: mach=true listener=false peer=false name=com.apple.webprivacyd
+2026-11-25 10:40:07.180 Df Simpl Courses[20323:e793] [com.apple.WebKit:Process] 0x1011052a8 - PageConfiguration::delaysWebProcessLaunchUntilFirstLoad() -> false because of associated processPool value
+2026-11-25 10:40:07.181 Df Simpl Courses[20323:e793] [com.apple.WebKit:Process] 0x10204d608 - WebProcessPool::createWebPage: Not delaying WebProcess launch
+2026-11-25 10:40:07.183 Df Simpl Courses[20323:e793] [com.apple.WebKit:Process] 0x1110c80c0 - [PID=0] WebProcessProxy::constructor:
+2026-11-25 10:40:07.196 Df Simpl Courses[20323:e7a8] [com.apple.extensionkit:launch] Launching process with config: bundleID: com.apple.WebKit.WebContent instance ID: Optional([_EXExtensionInstanceIdentifier: 87878F99-D087-4456-8FA0-0D215F06BD91])
+2026-11-25 10:40:07.206 Df Simpl Courses[20323:e793] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Bundle/Application/76ABBBE3-F9BE-4E75-8F8D-3ACC54164C11/Simpl Courses.app'
+2026-11-25 10:40:07.219 Df Simpl Courses[20323:e793] [com.apple.avkit:AVKit] +[AVPictureInPicturePlatformAdapter isPictureInPictureSupported]_block_invoke isPictureInPictureSupported NO
+2026-11-25 10:40:07.226 Df Simpl Courses[20323:e793] (libMobileGestalt.dylib) No persisted cache on this platform.
+2026-11-25 10:40:07.227 Df Simpl Courses[20323:e793] [com.apple.xpc:connection] [0x100d09320] activating connection: mach=true listener=false peer=false name=com.apple.IOSurface.Remote
+2026-11-25 10:40:07.230 Df Simpl Courses[20323:e793] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Data/Application/8A8194C1-5615-4C71-986F-6297C115D456/Library/WebKit/com.simplcourses.app/WebsiteData/MediaKeys/v1'
+2026-11-25 10:40:07.231 Df Simpl Courses[20323:e793] [com.apple.WebKit:ProcessSuspension] 0x1110e00c0 - [PID=0, throttler=0x1110c8150] ProcessThrottler::Activity::Activity: Starting foreground activity / 'Process initialization'
+2026-11-25 10:40:07.247 Df Simpl Courses[20323:e7ac] [com.apple.xpc:connection] [0x101213330] activating connection: mach=true listener=false peer=false name=com.apple.accessibility.mediaaccessibilityd
+2026-11-25 10:40:07.257 Df Simpl Courses[20323:e793] [com.apple.WebKit:Loading] 0x102062818 - [pageProxyID=99, webPageID=100, PID=0] WebPageProxy::constructor, site isolation enabled 0
+2026-11-25 10:40:07.261 Df Simpl Courses[20323:e793] [com.apple.WebKit:Media] PlaybackSessionManagerProxy::PlaybackSessionManagerProxy(398808316)
+2026-11-25 10:40:07.262 Df Simpl Courses[20323:e793] [com.apple.WebKit:Fullscreen] PlaybackSessionManagerProxy::VideoPresentationManagerProxy(398808316)
+2026-11-25 10:40:07.274 Df Simpl Courses[20323:e793] [com.apple.WebKit:Process] 0x1110c80c0 - [PID=0] WebProcessProxy::addExistingWebPage: webPage=0x102062818, pageProxyID=99, webPageID=100
+2026-11-25 10:40:07.276 Df Simpl Courses[20323:e793] [com.apple.WebKit:ProcessSwapping] 0x1110b40e0 - [PID=0] WebProcessCache::updateCapacity: Cache is disabled by client
+2026-11-25 10:40:07.278 Df Simpl Courses[20323:e793] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Data/Application/8A8194C1-5615-4C71-986F-6297C115D456/Library/Caches/com.apple.WebKit.GPU'
+2026-11-25 10:40:07.278 Df Simpl Courses[20323:e793] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Data/Application/8A8194C1-5615-4C71-986F-6297C115D456/tmp/com.apple.WebKit.GPU'
+2026-11-25 10:40:07.279 Df Simpl Courses[20323:e793] (libMobileGestalt.dylib) No persisted cache on this platform.
+2026-11-25 10:40:07.279 Df Simpl Courses[20323:e793] [com.apple.WebKit:ProcessSuspension] 0x1110e0120 - [PID=0, throttler=0x111110270] ProcessThrottler::Activity::Activity: Starting foreground activity / 'Process initialization'
+2026-11-25 10:40:07.280 Df Simpl Courses[20323:e7a9] [com.apple.extensionkit:launch] Launching process with config: bundleID: com.apple.WebKit.GPU instance ID: Optional([_EXExtensionInstanceIdentifier: EF831DB6-330A-4416-A339-5D3458698BCA])
+2026-11-25 10:40:07.322 Df Simpl Courses[20323:e793] [com.apple.WebKit:TextInteraction] Conforming to BrowserEngineKit text input protocol
+2026-11-25 10:40:07.342 Df Simpl Courses[20323:e793] [com.apple.WebKit:Process] 0x111130100 - NetworkProcessProxy::NetworkProcessProxy
+2026-11-25 10:40:07.342 Df Simpl Courses[20323:e793] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Data/Application/8A8194C1-5615-4C71-986F-6297C115D456/Library/WebKit/com.simplcourses.app/WebsiteData/ResourceLoadStatistics'
+2026-11-25 10:40:07.342 Df Simpl Courses[20323:e793] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Data/Application/8A8194C1-5615-4C71-986F-6297C115D456/Library/Caches/com.simplcourses.app/WebKit/NetworkCache'
+2026-11-25 10:40:07.342 Df Simpl Courses[20323:e793] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Data/Application/8A8194C1-5615-4C71-986F-6297C115D456/Library/Caches/com.simplcourses.app/WebKit/HSTS'
+2026-11-25 10:40:07.342 Df Simpl Courses[20323:e793] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Data/Application/8A8194C1-5615-4C71-986F-6297C115D456/Library/WebKit/com.simplcourses.app/WebsiteData/ResourceMonitorThrottler'
+2026-11-25 10:40:07.342 Df Simpl Courses[20323:e793] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Data/Application/8A8194C1-5615-4C71-986F-6297C115D456/Library/WebKit/com.simplcourses.app/WebsiteData/LocalStorage'
+2026-11-25 10:40:07.342 Df Simpl Courses[20323:e793] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Data/Application/8A8194C1-5615-4C71-986F-6297C115D456/Library/WebKit/com.simplcourses.app/WebsiteData/IndexedDB'
+2026-11-25 10:40:07.342 Df Simpl Courses[20323:e793] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Data/Application/8A8194C1-5615-4C71-986F-6297C115D456/Library/WebKit/com.simplcourses.app/WebsiteData/Default'
+2026-11-25 10:40:07.343 Df Simpl Courses[20323:e793] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Data/Application/8A8194C1-5615-4C71-986F-6297C115D456/Library/Caches/com.simplcourses.app/WebKit/CacheStorage'
+2026-11-25 10:40:07.343 Df Simpl Courses[20323:e793] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Data/Application/8A8194C1-5615-4C71-986F-6297C115D456/Library/Caches/com.simplcourses.app/WebKit/ServiceWorkers'
+2026-11-25 10:40:07.343 Df Simpl Courses[20323:e793] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Data/Application/8A8194C1-5615-4C71-986F-6297C115D456/Library/Caches/com.simplcourses.app/WebKit/AlternativeServices'
+2026-11-25 10:40:07.344 Df Simpl Courses[20323:e793] [com.apple.CFNetwork:Default] Initializing CFHTTPCookieStorage singleton
+2026-11-25 10:40:07.344 Df Simpl Courses[20323:e793] [com.apple.CFNetwork:Default] Creating default cookie storage with process/bundle identifier
+2026-11-25 10:40:07.346 Df Simpl Courses[20323:e793] [com.apple.network:] networkd_settings_read_from_file initialized networkd settings by reading plist directly
+2026-11-25 10:40:07.346 Df Simpl Courses[20323:e793] [com.apple.network:] networkd_settings_read_from_file initialized networkd settings by reading plist directly
+2026-11-25 10:40:07.346 Df Simpl Courses[20323:e793] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Data/Application/8A8194C1-5615-4C71-986F-6297C115D456/Library/Cookies'
+2026-11-25 10:40:07.346 Df Simpl Courses[20323:e793] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Data/Application/8A8194C1-5615-4C71-986F-6297C115D456/Library/Caches/com.apple.WebKit.Networking'
+2026-11-25 10:40:07.346 Df Simpl Courses[20323:e793] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Bundle/Application/76ABBBE3-F9BE-4E75-8F8D-3ACC54164C11/Simpl Courses.app'
+2026-11-25 10:40:07.348 Df Simpl Courses[20323:e793] [com.apple.WebKit:ProcessSuspension] 0x1110e01b0 - [PID=0, throttler=0x111130190] ProcessThrottler::Activity::Activity: Starting foreground activity / 'Process initialization'
+2026-11-25 10:40:07.349 Df Simpl Courses[20323:e7d8] [com.apple.extensionkit:launch] Launching process with config: bundleID: com.apple.WebKit.Networking instance ID: Optional([_EXExtensionInstanceIdentifier: E4C92307-442F-4F9B-BCF2-FFD12BF7CFF1])
+2026-11-25 10:40:07.350 E  Simpl Courses[20323:e7d8] [com.apple.extensionkit:default] Failed to resolve host network app id to config: bundleID: com.apple.WebKit.Networking instance ID: Optional([_EXExtensionInstanceIdentifier: E4C92307-442F-4F9B-BCF2-FFD12BF7CFF1])
+2026-11-25 10:40:07.367 Df Simpl Courses[20323:e7ab] [com.apple.UIKit:BackgroundTask] Ending background task with UIBackgroundTaskIdentifier: 1
+2026-11-25 10:40:07.369 Df Simpl Courses[20323:e7ab] [com.apple.UIKit:BackgroundTask] Ending task with identifier 1 and description: <_UIBackgroundTaskInfo: 0x600001704700>: taskID = 1, taskName = Launch Background Task for Coalescing, creationTime = 858 (elapsed = 1), _expireHandler: (null)
+2026-11-25 10:40:07.369 Df Simpl Courses[20323:e7ab] [com.apple.UIKit:BackgroundTask] Decrementing reference count for assertion <BKSProcessAssertion: 0x600002104f00> (used by background task with identifier 1: <_UIBackgroundTaskInfo: 0x600001704700>: taskID = 1, taskName = Launch Background Task for Coalescing, creationTime = 858 (elapsed = 1))
+2026-11-25 10:40:07.369 Df Simpl Courses[20323:e7ab] [com.apple.UIKit:BackgroundTask] Will invalidate assertion: <BKSProcessAssertion: 0x600002104f00> for task identifier: 1
+2026-11-25 10:40:07.566 Df Simpl Courses[20323:e793] [com.apple.UIKit:_UIVisualStyleRegistry] Warning: no visual style classes have been registered at all.
+2026-11-25 10:40:07.566 Df Simpl Courses[20323:e793] [com.apple.UIKit:_UIVisualStyleRegistry] Warning: no visual style classes have been registered at all.
+2026-11-25 10:40:07.566 Df Simpl Courses[20323:e793] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-11-25 10:40:07.566 Df Simpl Courses[20323:e793] [com.apple.UIKit:_UIVisualStyleRegistry] Note: no default visual style class registered as fallback for stylable class UIActivityIndicatorView
+2026-11-25 10:40:07.566 Df Simpl Courses[20323:e793] [PrototypeTools:domain] Not observing PTDefaults on customer install.
+2026-11-25 10:40:07.625 Df Simpl Courses[20323:e793] [com.apple.FrontBoard:SceneClient] [(FBSceneManager):sceneID:com.simplcourses.app-default] Sending action(s): BLSInvalidateFrameSpecifiersAction
+2026-11-25 10:40:07.628 A  Simpl Courses[20323:e793] (Security) SecItemCopyMatching_ios
+2026-11-25 10:40:07.628 Df Simpl Courses[20323:e793] [com.apple.securityd:secitemratelimit] Not internal release, disabling SIRL
+2026-11-25 10:40:07.630 Df Simpl Courses[20323:e793] [com.apple.securityd:thread-local-client-debug] SecSecurityClientGet new thread!
+2026-11-25 10:40:07.631 Df Simpl Courses[20323:e793] [com.apple.securityd:keychain] System Keychain Always Supported set via feature flag to disabled
+2026-11-25 10:40:07.632 Df Simpl Courses[20323:e793] [com.apple.xpc:connection] [0x101121020] activating connection: mach=true listener=false peer=false name=com.apple.securityd
+2026-11-25 10:40:07.636 Df securityd[2536:2e0d] [com.apple.securityd:SecError] Simpl Courses[20323]/1#-1 LF=0 copy_matching Error Domain=NSOSStatusErrorDomain Code=-34018 "Client has neither application-identifier nor keychain-access-groups entitlements" UserInfo={numberOfErrorsDeep=0, NSDescription=Client has neither application-identifier nor keychain-access-groups entitlements}
+2026-11-25 10:40:07.650 Df Simpl Courses[20323:e793] [com.apple.WebKit:ViewState] 0x1110c0100 - ApplicationStateTracker::setIsInBackground: 0
+2026-11-25 10:40:07.650 Df Simpl Courses[20323:e793] [com.apple.WebKit:ViewState] 0x1110c0100 - ApplicationStateTracker: add observers for scene
+2026-11-25 10:40:07.650 Df Simpl Courses[20323:e793] [com.apple.WebKit:ViewState] 0x101842400 - WKApplicationStateTrackingView: View with page [0x102062818, pageProxyID=99] was added to a window, _lastObservedStateWasBackground=0, isNowBackground=0
+2026-11-25 10:40:07.654 Df Simpl Courses[20323:e7ac] [com.apple.xpc:connection] [0x100d22130] activating connection: mach=true listener=false peer=false name=com.apple.fontservicesd
+2026-11-25 10:40:07.672 Df Simpl Courses[20323:e793] [com.apple.WebKit:ViewState] 0x102062818 - [pageProxyID=99, webPageID=100, PID=0] WebPageProxy::updateActivityState: view visibility state changed 0 -> 1
+2026-11-25 10:40:07.685 Df Simpl Courses[20323:e793] [com.apple.BackBoard:Keyboard] Activating connection to server: (null)
+2026-11-25 10:40:07.685 Df Simpl Courses[20323:e793] [com.apple.BackBoard:Keyboard] server remote target <BSXPCServiceConnectionProxy<BKSKeyboardServiceClientToServerIPC>: 0x60000291ff70>
+2026-11-25 10:40:07.685 Df Simpl Courses[20323:e793] [com.apple.BackBoard:Keyboard] currently observing: YES
+2026-11-25 10:40:07.686 Df Simpl Courses[20323:e793] [com.apple.BackBoard:Keyboard] connected: (
+    "<BKSHIDKeyboardDevice: 0x600000273500> {\134n    senderID: 0xACEFADE00000003;\134n    transport: <nil>;\134n    language: <nil>;\134n    layout: US;\134n    countryCode: 0;\134n    standardType: 4294967295;\134n    subinterfaceID: 0;\134n    capsLockKeyHasLanguageSwitchLabel: NO;\134n    globeKeyLabelHasGlobeSymbol: NO;\134n}"
+)
+2026-11-25 10:40:07.686 Df Simpl Courses[20323:e793] [com.apple.BackBoard:Keyboard] currently observing: NO
+2026-11-25 10:40:07.686 Df Simpl Courses[20323:e793] [com.apple.BackBoard:Keyboard] disconnected: (
+    "<BKSHIDKeyboardDevice: 0x600000273500> {\134n    senderID: 0xACEFADE00000003;\134n    transport: <nil>;\134n    language: <nil>;\134n    layout: US;\134n    countryCode: 0;\134n    standardType: 4294967295;\134n    subinterfaceID: 0;\134n    capsLockKeyHasLanguageSwitchLabel: NO;\134n    globeKeyLabelHasGlobeSymbol: NO;\134n}"
+)
+2026-11-25 10:40:07.686 Df Simpl Courses[20323:e793] [com.apple.BackBoard:Keyboard] currently observing: YES
+2026-11-25 10:40:07.687 Df Simpl Courses[20323:e793] [com.apple.BackBoard:Keyboard] connected: (
+    "<BKSHIDKeyboardDevice: 0x60000027a840> {\134n    senderID: 0xACEFADE00000003;\134n    transport: <nil>;\134n    language: <nil>;\134n    layout: US;\134n    countryCode: 0;\134n    standardType: 4294967295;\134n    subinterfaceID: 0;\134n    capsLockKeyHasLanguageSwitchLabel: NO;\134n    globeKeyLabelHasGlobeSymbol: NO;\134n}"
+)
+2026-11-25 10:40:07.687 Df Simpl Courses[20323:e793] [com.apple.BackBoard:Keyboard] currently observing: NO
+2026-11-25 10:40:07.687 Df Simpl Courses[20323:e793] [com.apple.BackBoard:Keyboard] disconnected: (
+    "<BKSHIDKeyboardDevice: 0x60000027a840> {\134n    senderID: 0xACEFADE00000003;\134n    transport: <nil>;\134n    language: <nil>;\134n    layout: US;\134n    countryCode: 0;\134n    standardType: 4294967295;\134n    subinterfaceID: 0;\134n    capsLockKeyHasLanguageSwitchLabel: NO;\134n    globeKeyLabelHasGlobeSymbol: NO;\134n}"
+)
+2026-11-25 10:40:07.691 Df Simpl Courses[20323:e793] [com.apple.UIKit:HardwareKeyboard] -[UIApplication GSKeyboardForHWLayout:senderID:forceRebuild:createIfNeeded:], New hardware layout is created with US layout and 0 standardType.
+2026-11-25 10:40:07.691 Df Simpl Courses[20323:e793] [com.apple.BackBoard:Keyboard] currently observing: YES
+2026-11-25 10:40:07.692 Df Simpl Courses[20323:e793] [com.apple.BackBoard:Keyboard] connected: (
+    "<BKSHIDKeyboardDevice: 0x6000002736e0> {\134n    senderID: 0xACEFADE00000003;\134n    transport: <nil>;\134n    language: <nil>;\134n    layout: US;\134n    countryCode: 0;\134n    standardType: 4294967295;\134n    subinterfaceID: 0;\134n    capsLockKeyHasLanguageSwitchLabel: NO;\134n    globeKeyLabelHasGlobeSymbol: NO;\134n}"
+)
+2026-11-25 10:40:07.692 Df Simpl Courses[20323:e793] [com.apple.BackBoard:Keyboard] currently observing: NO
+2026-11-25 10:40:07.692 Df Simpl Courses[20323:e793] [com.apple.BackBoard:Keyboard] disconnected: (
+    "<BKSHIDKeyboardDevice: 0x6000002736e0> {\134n    senderID: 0xACEFADE00000003;\134n    transport: <nil>;\134n    language: <nil>;\134n    layout: US;\134n    countryCode: 0;\134n    standardType: 4294967295;\134n    subinterfaceID: 0;\134n    capsLockKeyHasLanguageSwitchLabel: NO;\134n    globeKeyLabelHasGlobeSymbol: NO;\134n}"
+)
+2026-11-25 10:40:07.692 Df Simpl Courses[20323:e793] [com.apple.WebKit:ViewState] 0x102062818 - [pageProxyID=99, webPageID=100, PID=0] WebPageProxy::viewIsBecomingVisible:
+2026-11-25 10:40:07.710 Df Simpl Courses[20323:e793] [com.apple.WebKit:ScreenTime] Screen Time has updated to use the system shield for any blocked URL.
+2026-11-25 10:40:07.710 Df Simpl Courses[20323:e793] [com.apple.WebKit:ProcessSuspension] 0x102062818 - [pageProxyID=99, webPageID=100, PID=0] WebPageProxy::updateThrottleState: UIProcess is taking a foreground assertion because the view is visible
+2026-11-25 10:40:07.710 Df Simpl Courses[20323:e793] [com.apple.WebKit:ProcessSuspension] 0x1110e0270 - [PID=0, throttler=0x1110c8150] ProcessThrottler::Activity::Activity: Starting foreground activity / 'View is visible'
+2026-11-25 10:40:07.712 Df Simpl Courses[20323:e793] [com.apple.WebKit:RemoteLayerTree] RemoteLayerTreeDrawingAreaProxy(102)::hideContentUntilAnyUpdate
+2026-11-25 10:40:07.713 Df Simpl Courses[20323:e793] [com.apple.WebKit:ViewState] 0x102024e00 (pageProxyID=99) -[WKWebView _endLiveResize]
+2026-11-25 10:40:07.741 Df Simpl Courses[20323:e793] [com.apple.network:activity] Create activity from XPC object <nw_activity 50:1 [5153475A-2C3C-419B-8DA2-0DA50ADCF79F] (reporting strategy default)>
+2026-11-25 10:40:07.741 Df Simpl Courses[20323:e793] [com.apple.network:activity] Create activity from XPC object <nw_activity 50:2 [C9DEAAC7-FAB1-4326-806E-03DE29DF1454] (reporting strategy default)>
+2026-11-25 10:40:07.741 Df Simpl Courses[20323:e793] [com.apple.network:activity] Set activity <nw_activity 50:1 [5153475A-2C3C-419B-8DA2-0DA50ADCF79F] (reporting strategy default)> as the global parent
+2026-11-25 10:40:07.741 Df Simpl Courses[20323:e793] [com.apple.BackgroundTasks:Framework] Handling app launch
+2026-11-25 10:40:07.746 A  Simpl Courses[20323:e7d9] (RunningBoardServices) didChangeInheritances
+2026-11-25 10:40:07.750 A  Simpl Courses[20323:e7ab] (RunningBoardServices) didChangeInheritances
+2026-11-25 10:40:07.752 Df Simpl Courses[20323:e793] [com.apple.UIKit:EventDeferring] [0x600002916680] Scene target of event deferring environments did update: scene: 0x101105740; current systemShellManagesKeyboardFocus: 1; systemShellManagesKeyboardFocusForScene: 1; eligibleForRecordRemoval: 1;
+2026-11-25 10:40:07.752 Df Simpl Courses[20323:e793] [com.apple.UIKit:KeyWindow] Scene became target of keyboard event deferring environment: UIWindowScene: 0x101105740; scene identity: com.apple.frontboard.systemappservices/FBSceneManager:sceneID%3Acom.simplcourses.app-default
+2026-11-25 10:40:07.752 Df Simpl Courses[20323:e793] [com.apple.Accessibility:AXCommon] Read Per-App on Init: Smart invert = (null)
+2026-11-25 10:40:07.758 A  Simpl Courses[20323:e7ab] (RunningBoardServices) didChangeInheritances
+2026-11-25 10:40:07.760 Df Simpl Courses[20323:e793] [com.apple.gamecontroller:Session] Creating the shared game controller session...
+2026-11-25 10:40:07.769 Df backboardd[2408:e731] [com.apple.iohid:default] Connection added: IOHIDEventSystemConnection uuid:FC744186-581D-467C-9D01-0591720D9C0B pid:20323 process:Simpl Courses type:Monitor entitlements:0x0 caller:GameControllerFoundation: -[GCHIDEventSystemClient initWithQueue:type:attributes:functions:] + 116 attributes:(null) state:0x0 events:0 mask:0x0 dropped:0 dropStatus:0 droppedMask:0x0 lastDroppedTime:NONE
+2026-11-25 10:40:07.772 Df Simpl Courses[20323:e793] [com.apple.BackBoard:EventDelivery] policyStatus:<BKSHIDEventDeliveryPolicyObserver: 0x60000261d140; process scope; status: target> was:none
+2026-11-25 10:40:07.772 A  Simpl Courses[20323:e793] (GameController) [GCDeviceSession] Activate
+2026-11-25 10:40:07.774 Df Simpl Courses[20323:e793] [com.apple.UIKit:UpdateScheduler] Target list changed: <CADisplay:LCD PurpleMain>
+2026-11-25 10:40:07.776 Df Simpl Courses[20323:e793] [com.apple.UIKit:AppLifecycle] sceneOfRecord: sceneID: sceneID:com.simplcourses.app-default  persistentID: 7A218B54-9DBB-4981-892D-297E11963F16
+2026-11-25 10:40:07.776 Df Simpl Courses[20323:e793] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x101105740> (7A218B54-9DBB-4981-892D-297E11963F16)
+2026-11-25 10:40:07.789 Df Simpl Courses[20323:e793] [com.apple.FrontBoard:SceneExtension] Realizing settings extension SBUISecureRenderingSettingsExtension on FBSSceneSettings
+2026-11-25 10:40:07.791 Df Simpl Courses[20323:e793] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x101105740> (7A218B54-9DBB-4981-892D-297E11963F16)
+2026-11-25 10:40:07.792 Df Simpl Courses[20323:e793] [com.apple.UIKit:InterfaceStyle] Not push traits update to screen for new style 1, <UIWindowScene: 0x101105740> (7A218B54-9DBB-4981-892D-297E11963F16)
+2026-11-25 10:40:07.794 Df Simpl Courses[20323:e793] [com.apple.UIKit:AppLifecycle] sceneOfRecord: sceneID: sceneID:com.simplcourses.app-default  persistentID: 7A218B54-9DBB-4981-892D-297E11963F16
+2026-11-25 10:40:07.794 Df Simpl Courses[20323:e793] [com.apple.UIKit:Application] Deactivation reason removed: 12; deactivation reasons: 4128 -> 32; animating application lifecycle event: 1
+2026-11-25 10:40:07.794 Df Simpl Courses[20323:e793] [com.apple.KeyboardArbiter:Client] Send setDeactivating: N (-DeactivationReason:SuspendedEventsOnly)
+2026-11-25 10:40:07.794 Df Simpl Courses[20323:e793] [com.apple.UIKit:Application] Deactivation reason removed: 5; deactivation reasons: 32 -> 0; animating application lifecycle event: 0
+2026-11-25 10:40:07.795 Df Simpl Courses[20323:e793] [com.apple.WebKit:Fullscreen] PlaybackSessionManagerProxy::applicationDidBecomeActive(398808316)
+2026-11-25 10:40:07.795 A  Simpl Courses[20323:e793] (GameController) Notify ApplicationDidBecomeActive
+2026-11-25 10:40:07.839 Df Simpl Courses[20323:e793] [com.apple.gamecontroller:Session] Connected devices changed (2 added, 0 removed) -> [2] {(
+    <GCController 0x600003d084b0 'MFi'/'Gamepad'>,
+    <GCKeyboard 0x600000273da0 'Generic Keyboard'>
+)}
+2026-11-25 10:40:07.841 Df Simpl Courses[20323:e793] [com.apple.CoreAnalytics:client] No XPC connection in Simulator
+2026-11-25 10:40:07.842 Df Simpl Courses[20323:e793] [com.apple.gamecontroller:Session] Connected devices changed (0 added, 0 removed) -> [2] {(
+    <GCController 0x600003d084b0 'MFi'/'Gamepad'>,
+    <GCKeyboard 0x600000273da0 'Generic Keyboard'>
+)}
+2026-11-25 10:40:07.844 Df Simpl Courses[20323:e793] [com.apple.gamecontroller:Session] Connected devices changed (0 added, 0 removed) -> [2] {(
+    <GCController 0x600003d084b0 'MFi'/'Gamepad'>,
+    <GCKeyboard 0x600000273da0 'Generic Keyboard'>
+)}
+2026-11-25 10:40:07.844 A  Simpl Courses[20323:e793] (GameControllerFoundation) [HID Event System Client] Activate
+2026-11-25 10:40:07.845 Df Simpl Courses[20323:e793] [com.apple.KeyboardArbiter:Client] startConnection
+2026-11-25 10:40:07.849 Df Simpl Courses[20323:e793] [com.apple.xpc:connection] [0x10120e270] activating connection: mach=true listener=false peer=false name=com.apple.UIKit.KeyboardManagement.hosted
+2026-11-25 10:40:07.853 Df Simpl Courses[20323:e793] [com.apple.WebKit:Loading] 0x102062818 - [pageProxyID=99, webPageID=100, PID=0] WebPageProxy::loadRequest:
+2026-11-25 10:40:07.853 Df Simpl Courses[20323:e793] [com.apple.WebKit:Loading] 0x102062818 - [pageProxyID=99, webPageID=100, PID=0] WebPageProxy::loadRequestWithNavigationShared:
+2026-11-25 10:40:07.863 Df Simpl Courses[20323:e793] [com.apple.WebKit:ProcessSuspension] 0x111124100 - NavigationState is taking a process network assertion because a page load started
+2026-11-25 10:40:07.864 Df Simpl Courses[20323:e793] [com.apple.WebKit:ProcessSuspension] 0x1110e02a0 - [PID=0, throttler=0x1110c8150] ProcessThrottler::Activity::Activity: Starting background activity / 'Page Load'
+2026-11-25 10:40:07.882 Df Simpl Courses[20323:e793] [com.apple.KeyboardArbiter:Client] handleKeyboardChange: set currentKeyboard:N (wasKeyboard:N)
+2026-11-25 10:40:07.887 Df Simpl Courses[20323:e793] [com.apple.UIKit:KeyboardArbiterClientLog] isWritingToolsHandlingKeyboardTracking:Y (WT ready:Y, Arbiter ready:Y)
+2026-11-25 10:40:07.929 Df Simpl Courses[20323:e793] [com.apple.network:activity] <nw_activity 50:1 [5153475A-2C3C-419B-8DA2-0DA50ADCF79F] (global parent) (reporting strategy default) complete (reason success)> complete with reason 2 (success), duration 5104ms
+2026-11-25 10:40:07.929 Df Simpl Courses[20323:e793] [com.apple.network:activity] <nw_activity 50:2 [C9DEAAC7-FAB1-4326-806E-03DE29DF1454] (reporting strategy default) complete (reason success)> complete with reason 2 (success), duration 5104ms
+2026-11-25 10:40:07.929 Df Simpl Courses[20323:e793] [com.apple.network:activity] Unsetting the global parent activity <nw_activity 50:1 [5153475A-2C3C-419B-8DA2-0DA50ADCF79F] (global parent) (reporting strategy default) complete (reason success)>
+2026-11-25 10:40:07.929 Df Simpl Courses[20323:e793] [com.apple.network:activity] Unset the global parent activity
+2026-11-25 10:40:08.108 A  Simpl Courses[20323:e7ac] (RunningBoardServices) didChangeInheritances
+2026-11-25 10:40:08.442 Df Simpl Courses[20323:e7a8] [com.apple.runningboard:process] Starting death monitoring for handle [xpcservice<com.apple.WebKit.WebContent([app<com.simplcourses.app((null))>:20323])>{vt hash: 71395982}[uuid:87878F99-D087-4456-8FA0-0D215F06BD91]{definition:com.apple.WebKit.WebContent[extension][client]}:20340]
+2026-11-25 10:40:08.521 Df Simpl Courses[20323:e7a8] [com.apple.extensionkit:launch] Created new process ExtensionProcess: bundleID: com.apple.WebKit.WebContent instance ID: Optional([_EXExtensionInstanceIdentifier: 87878F99-D087-4456-8FA0-0D215F06BD91]) pid: 20340.
+2026-11-25 10:40:08.522 Df Simpl Courses[20323:e7a8] [com.apple.WebKit:Process] AssertionCapability::AssertionCapability: taking assertion Foreground
+2026-11-25 10:40:08.528 Df Simpl Courses[20323:e793] [com.apple.xpc:connection] [0x1011042e0] activating connection: mach=false listener=false peer=false name=(anonymous)
+2026-11-25 10:40:08.542 A  Simpl Courses[20323:e7a8] (CoreFoundation) Updating Key-Value Observers Of Preferences
+2026-11-25 10:40:08.570 A  Simpl Courses[20323:e7a8] (CoreFoundation) Updating Key-Value Observers Of Preferences
+2026-11-25 10:40:08.572 A  Simpl Courses[20323:e7a8] (CoreFoundation) Updating Key-Value Observers Of Preferences
+2026-11-25 10:40:08.575 A  Simpl Courses[20323:e7a8] (CoreFoundation) Updating Key-Value Observers Of Preferences
+2026-11-25 10:40:08.579 A  Simpl Courses[20323:e7a8] (CoreFoundation) Updating Key-Value Observers Of Preferences
+2026-11-25 10:40:08.582 A  Simpl Courses[20323:e7a8] (CoreFoundation) Updating Key-Value Observers Of Preferences
+2026-11-25 10:40:08.602 A  Simpl Courses[20323:e7a8] (CoreFoundation) Updating Key-Value Observers Of Preferences
+2026-11-25 10:40:08.645 A  Simpl Courses[20323:e7a8] (CoreFoundation) Updating Key-Value Observers Of Preferences
+2026-11-25 10:40:08.665 A  Simpl Courses[20323:e7a8] (CoreFoundation) Updating Key-Value Observers Of Preferences
+2026-11-25 10:40:08.679 A  Simpl Courses[20323:e7a8] (CoreFoundation) Updating Key-Value Observers Of Preferences
+2026-11-25 10:40:08.704 Df Simpl Courses[20323:e793] [com.apple.UIKit:AppLifecycle] sceneOfRecord: sceneID: sceneID:com.simplcourses.app-default  persistentID: 7A218B54-9DBB-4981-892D-297E11963F16
+2026-11-25 10:40:08.755 Df Simpl Courses[20323:e793] (WebKit) WebContent[20340] Installed launch log hook
+2026-11-25 10:40:08.776 Df Simpl Courses[20323:e7a9] [com.apple.runningboard:process] Starting death monitoring for handle [xpcservice<com.apple.WebKit.GPU([app<com.simplcourses.app((null))>:20323])>{vt hash: 223737757}[uuid:EF831DB6-330A-4416-A339-5D3458698BCA]{definition:com.apple.WebKit.GPU[extension][client]}:20341]
+2026-11-25 10:40:08.787 Df Simpl Courses[20323:e793] [com.apple.WebKit:Process] 0x1110c80c0 - [PID=20340] WebProcessProxy::didFinishLaunching:
+2026-11-25 10:40:08.787 F  Simpl Courses[20323:e793] [com.apple.WebKit:Process] WebContent process (0x1110c80c0) took 1.599023 seconds to launch
+2026-11-25 10:40:08.787 A  Simpl Courses[20323:e793] (libsystem_trace.dylib) Activity for state dumps
+2026-11-25 10:40:08.790 Df Simpl Courses[20323:e793] [com.apple.WebKit:ProcessSuspension] 0x1110c8150 - [PID=20340] ProcessThrottler::didConnectToProcess
+2026-11-25 10:40:08.791 Df Simpl Courses[20323:e793] [com.apple.WebKit:ProcessSuspension] 0x1110c8150 - [PID=20340] ProcessThrottler::setThrottleState: Updating process assertion type to 3 (foregroundActivities=2, backgroundActivities=6)
+2026-11-25 10:40:08.791 Df Simpl Courses[20323:e793] [com.apple.WebKit:Process] AssertionCapability::AssertionCapability: taking assertion Foreground
+2026-11-25 10:40:08.793 Df Simpl Courses[20323:e793] [com.apple.WebKit:ProcessSuspension] 0x60000172fe40 - WKProcessAssertionBackgroundTaskManager: beginBackgroundTaskWithName
+2026-11-25 10:40:08.793 Df Simpl Courses[20323:e793] [com.apple.WebKit:ProcessSuspension] WKProcessAssertionBackgroundTaskManager: Took a FinishTaskInterruptable assertion for own process
+2026-11-25 10:40:08.794 Df Simpl Courses[20323:e793] [com.apple.WebKit:ProcessSuspension] 0x1110c80c0 - [PID=20340] WebProcessProxy::didChangeThrottleState: type=2
+2026-11-25 10:40:08.794 Df Simpl Courses[20323:e793] [com.apple.WebKit:ProcessSuspension] 0x1110c80c0 - [PID=20340] WebProcessProxy::didChangeThrottleState(Foreground) Taking foreground assertion for network process
+2026-11-25 10:40:08.794 Df Simpl Courses[20323:e793] [com.apple.WebKit:ProcessSuspension] 0x1110e0300 - [PID=0, throttler=0x111130190] ProcessThrottler::Activity::Activity: Starting foreground activity / 'Networking for foreground view(s)'
+2026-11-25 10:40:08.794 Df Simpl Courses[20323:e793] [com.apple.WebKit:ProcessSuspension] 0x1110e0330 - [PID=0, throttler=0x111110270] ProcessThrottler::Activity::Activity: Starting foreground activity / 'GPU for foreground view(s)'
+2026-11-25 10:40:08.794 Df Simpl Courses[20323:e793] [com.apple.WebKit:Process] 0x111130100 - NetworkProcessProxy::sendXPCEndpointToProcess(0x1110c80c0) state = 1 has connection = 1 XPC endpoint message = 0x0
+2026-11-25 10:40:08.804 Sd Simpl Courses[20323:0] (79E72B83-2384-3A91-8EE7-4315E85E9A91) IOHIDManager State
+{
+    DispatchQueue = 0;
+    RunLoop = 1;
+    createOptions = 0;
+    isOpen = 0;
+    openOptions = 0;
+}
+2026-11-25 10:40:08.805 Sd Simpl Courses[20323:0] (71A4AB2B-6C63-3811-A45D-80D677A41A21) UAUserActivity
+UAUserActivityManager supportsActivityContinuation=YES isEnabled=YES serverPid=0 PROJECT:UserActivity-551
+2026-11-25 10:40:08.805 Sd Simpl Courses[20323:0] (71A4AB2B-6C63-3811-A45D-80D677A41A21) UAUserActivity
+[201D0713-9EC9-41FD-95E5-43952967C4CE userInfo.count=1 dirty 
+2026-11-25 10:40:08.806 Df Simpl Courses[20323:e7ac] [com.apple.WebKit:ProcessSuspension] 0x11117c0c0 - ProcessAssertion::acquireSync Trying to take RBS assertion 'WebProcess Foreground Assertion' for process with PID=20340
+2026-11-25 10:40:08.839 Df Simpl Courses[20323:e7ac] [com.apple.WebKit:ProcessSuspension] 0x11117c0c0 - ProcessAssertion() Successfully granted capability
+2026-11-25 10:40:08.848 Df Simpl Courses[20323:e7a9] [com.apple.extensionkit:launch] Created new process ExtensionProcess: bundleID: com.apple.WebKit.GPU instance ID: Optional([_EXExtensionInstanceIdentifier: EF831DB6-330A-4416-A339-5D3458698BCA]) pid: 20341.
+2026-11-25 10:40:08.848 Df Simpl Courses[20323:e7a9] [com.apple.WebKit:Process] AssertionCapability::AssertionCapability: taking assertion Foreground
+2026-11-25 10:40:08.852 Df Simpl Courses[20323:e793] [com.apple.xpc:connection] [0x100d12a50] activating connection: mach=false listener=false peer=false name=(anonymous)
+2026-11-25 10:40:08.962 Df Simpl Courses[20323:e793] [com.apple.WebKit:Process] WebContent[20340] getNetworkProcessConnection: Request connection for core identifier 3
+2026-11-25 10:40:08.963 Df Simpl Courses[20323:e793] [com.apple.WebKit:ProcessSuspension] 0x1110e00c0 - [PID=20340, throttler=0x1110c8150] ProcessThrottler::Activity::invalidate: Ending foreground activity / 'Process initialization'
+2026-11-25 10:40:08.964 Df Simpl Courses[20323:e793] [com.apple.WebKit:ProcessSuspension] 0x111130100 - NetworkProcessProxy::getNetworkProcessConnection: Taking a background assertion because web process pid 20340 (core identifier 3) is requesting a connection
+2026-11-25 10:40:08.970 Df Simpl Courses[20323:e793] [com.apple.WebKit:Process] 0x1111101e0 - GPUProcessProxy::didFinishLaunching:
+2026-11-25 10:40:08.971 F  Simpl Courses[20323:e793] [com.apple.WebKit:Process] GPU process (0x1111101e0) took 1.693520 seconds to launch
+2026-11-25 10:40:08.971 A  Simpl Courses[20323:e793] (libsystem_trace.dylib) Activity for state dumps
+2026-11-25 10:40:08.971 Df Simpl Courses[20323:e793] [com.apple.WebKit:Process] 0x1111101e0 - GPUProcessProxy::connectionWillOpen:
+2026-11-25 10:40:08.971 Df Simpl Courses[20323:e793] [com.apple.WebKit:ProcessSuspension] 0x111110270 - [PID=20341] ProcessThrottler::didConnectToProcess
+2026-11-25 10:40:08.971 Df Simpl Courses[20323:e793] [com.apple.WebKit:ProcessSuspension] 0x111110270 - [PID=20341] ProcessThrottler::setThrottleState: Updating process assertion type to 3 (foregroundActivities=2, backgroundActivities=1)
+2026-11-25 10:40:08.971 Df Simpl Courses[20323:e793] [com.apple.WebKit:Process] AssertionCapability::AssertionCapability: taking assertion Foreground
+2026-11-25 10:40:08.971 Df Simpl Courses[20323:e7ac] [com.apple.WebKit:ProcessSuspension] 0x11117c180 - ProcessAssertion::acquireSync Trying to take RBS assertion 'GPUProcess Foreground Assertion' for process with PID=20341
+2026-11-25 10:40:08.971 Df Simpl Courses[20323:e793] [com.apple.WebKit:Process] 0x111130100 - NetworkProcessProxy::sendXPCEndpointToProcess(0x1111101e0) state = 1 has connection = 1 XPC endpoint message = 0x0
+2026-11-25 10:40:08.972 A  Simpl Courses[20323:e7ae] (CoreServicesInternal) CFURLCreateBookmarkData
+2026-11-25 10:40:08.973 Df Simpl Courses[20323:e7ac] [com.apple.WebKit:ProcessSuspension] 0x11117c180 - ProcessAssertion() Successfully granted capability
+2026-11-25 10:40:09.019 Df Simpl Courses[20323:e793] [com.apple.WebKit:ProcessSuspension] 0x1110e0120 - [PID=20341, throttler=0x111110270] ProcessThrottler::Activity::invalidate: Ending foreground activity / 'Process initialization'
+2026-11-25 10:40:09.381 Df Simpl Courses[20323:e7d8] [com.apple.runningboard:process] Starting death monitoring for handle [xpcservice<com.apple.WebKit.Networking([app<com.simplcourses.app((null))>:20323])>{vt hash: 114736818}[uuid:E4C92307-442F-4F9B-BCF2-FFD12BF7CFF1]{definition:com.apple.WebKit.Networking[extension][client]}:20343]
+2026-11-25 10:40:09.396 Df Simpl Courses[20323:e7d8] [com.apple.extensionkit:launch] Created new process ExtensionProcess: bundleID: com.apple.WebKit.Networking instance ID: Optional([_EXExtensionInstanceIdentifier: E4C92307-442F-4F9B-BCF2-FFD12BF7CFF1]) pid: 20343.
+2026-11-25 10:40:09.397 Df Simpl Courses[20323:e7d8] [com.apple.WebKit:Process] AssertionCapability::AssertionCapability: taking assertion Foreground
+2026-11-25 10:40:09.399 Df Simpl Courses[20323:e793] [com.apple.xpc:connection] [0x10111bac0] activating connection: mach=false listener=false peer=false name=(anonymous)
+2026-11-25 10:40:09.677 Df Simpl Courses[20323:e793] [com.apple.WebKit:Process] 0x111130100 - NetworkProcessProxy::didFinishLaunching
+2026-11-25 10:40:09.677 F  Simpl Courses[20323:e793] [com.apple.WebKit:Process] Networking process (0x111130100) took 2.335228 seconds to launch
+2026-11-25 10:40:09.677 A  Simpl Courses[20323:e793] (libsystem_trace.dylib) Activity for state dumps
+2026-11-25 10:40:09.677 Df Simpl Courses[20323:e793] [com.apple.WebKit:ProcessSuspension] 0x111130190 - [PID=20343] ProcessThrottler::didConnectToProcess
+2026-11-25 10:40:09.677 Df Simpl Courses[20323:e793] [com.apple.WebKit:ProcessSuspension] 0x111130190 - [PID=20343] ProcessThrottler::setThrottleState: Updating process assertion type to 3 (foregroundActivities=2, backgroundActivities=2)
+2026-11-25 10:40:09.677 Df Simpl Courses[20323:e793] [com.apple.WebKit:Process] AssertionCapability::AssertionCapability: taking assertion Foreground
+2026-11-25 10:40:09.678 Df Simpl Courses[20323:e7a8] [com.apple.WebKit:ProcessSuspension] 0x11117c240 - ProcessAssertion::acquireSync Trying to take RBS assertion 'NetworkProcess Foreground Assertion' for process with PID=20343
+2026-11-25 10:40:09.678 Sd Simpl Courses[20323:0] (79E72B83-2384-3A91-8EE7-4315E85E9A91) IOHIDManager State
+{
+    DispatchQueue = 0;
+    RunLoop = 1;
+    createOptions = 0;
+    isOpen = 0;
+    openOptions = 0;
+}
+2026-11-25 10:40:09.678 Sd Simpl Courses[20323:0] (71A4AB2B-6C63-3811-A45D-80D677A41A21) UAUserActivity
+UAUserActivityManager supportsActivityContinuation=YES isEnabled=YES serverPid=0 PROJECT:UserActivity-551
+2026-11-25 10:40:09.678 Sd Simpl Courses[20323:0] (71A4AB2B-6C63-3811-A45D-80D677A41A21) UAUserActivity
+[201D0713-9EC9-41FD-95E5-43952967C4CE userInfo.count=1 dirty 
+2026-11-25 10:40:09.679 Df Simpl Courses[20323:e7a8] [com.apple.WebKit:ProcessSuspension] 0x11117c240 - ProcessAssertion() Successfully granted capability
+2026-11-25 10:40:09.689 Df Simpl Courses[20323:e793] [com.apple.WebKit:Process] 0x111130100 - NetworkProcessProxy::sendXPCEndpointToProcess(0x1110c80c0) state = 1 has connection = 1 XPC endpoint message = 0x600003e1cd00
+2026-11-25 10:40:09.689 Df Simpl Courses[20323:e793] [com.apple.WebKit:Process] 0x111130100 - NetworkProcessProxy::sendXPCEndpointToProcess(0x1111101e0) state = 1 has connection = 1 XPC endpoint message = 0x600003e1cd00
+2026-11-25 10:40:09.689 Df Simpl Courses[20323:e793] [com.apple.xpc:connection] WebContent[20340] [0x101106f90] activating connection: mach=false listener=false peer=false name=(anonymous)
+2026-11-25 10:40:09.770 Df Simpl Courses[20323:e793] [com.apple.WebKit:ProcessSuspension] 0x1110e01b0 - [PID=20343, throttler=0x111130190] ProcessThrottler::Activity::invalidate: Ending foreground activity / 'Process initialization'
+2026-11-25 10:40:09.789 Df Simpl Courses[20323:e793] [com.apple.WebKit:Loading] WebContent[20340] Received Launch Services database
+2026-11-25 10:40:09.801 Df Simpl Courses[20323:e793] [com.apple.WebKit:Process] WebContent[20340] 0x10c060150 - [sessionID=1] WebProcess::initializeLogForwarding: Debug logging enabled: 0
+2026-11-25 10:40:09.802 Df Simpl Courses[20323:e793] [com.apple.WebKit:Process] WebContent[20340] WebProcess::platformInitializeWebProcess
+2026-11-25 10:40:09.811 Df Simpl Courses[20323:e793] [com.apple.xpc:connection] WebContent[20340] [0x100605890] activating connection: mach=false listener=true peer=false name=(anonymous)
+2026-11-25 10:40:09.811 Df Simpl Courses[20323:e793] [com.apple.xpc:connection] WebContent[20340] [0x100605890] Connection returned listener port: 0x3803
+2026-11-25 10:40:09.811 Df Simpl Courses[20323:e793] [com.apple.xpc:connection] WebContent[20340] [0x1006059d0] activating connection: mach=false listener=false peer=false name=(anonymous)
+2026-11-25 10:40:09.811 Df Simpl Courses[20323:e793] [com.apple.xpc:connection] WebContent[20340] [0x100605b10] activating connection: mach=false listener=false peer=true name=com.apple.xpc.anonymous.0x100605890.peer[20340].0x100605b10
+2026-11-25 10:40:09.907 Df Simpl Courses[20323:e793] [com.apple.Accessibility:AXSupportCommon] WebContent[20340] Application accessibility enabled: 0, (
+	0   libAccessibility.dylib              0x000000019215585c _AXSApplicationAccessibilitySetEnabled + 76
+	1   WebKit                              0x000000018e01aa24 _ZN6WebKit10WebProcess28platformInitializeWebProcessERNS_28WebProcessCreationParametersE + 2096
+	2   WebKit                              0x000000018e1fcc94 _ZN6WebKit10WebProcess20initializeWebProcessEONS_28WebProcessCreationParametersEON3WTF17CompletionHandlerIFvN7WebCore15ProcessIdentityEEEE + 188
+	3   WebKit                              0x000000018db9b684 _ZN3IPC18handleMessageAsyncIN8Messages10WebProcess20InitializeWebProcessENS_10ConnectionEN6WebKit10WebProcessES6_FvONS5_28WebProcessCreationParametersEON3WTF17CompletionHandlerIFvN7WebCore15ProcessIdentityEEEEEEEvRT0_RNS_7DecoderEPT1_MT2_T3_ + 224
+	4   WebKit                              0x000000018e5c03cc _ZN3IPC10Connection15dispatchMessageEN3WTF9UniqueRefINS_7DecoderEEE + 556
+	5   WebKit                              0x000000018e5db49c _Z<…>
+2026-11-25 10:40:09.907 Df Simpl Courses[20323:e793] [com.apple.Accessibility:AXSupportCommon] WebContent[20340] Stored App AX setting: 0
+2026-11-25 10:40:09.909 Df Simpl Courses[20323:e793] [com.apple.Accessibility:AXSupportCommon] WebContent[20340] AXS AccessibilityEnabled: (app ax: 0), ax settings: 0, cached: 0
+2026-11-25 10:40:09.914 Df Simpl Courses[20323:e7a8] [com.apple.xpc:connection] [0x1011042e0] Re-initialization successful; calling out to event handler with XPC_ERROR_CONNECTION_INTERRUPTED
+2026-11-25 10:40:10.084 E  Simpl Courses[20323:e793] [com.apple.WebKit:ResourceLoadStatistics] Failed to request storage access quirks from WebPrivacy.
+2026-11-25 10:40:10.084 E  Simpl Courses[20323:e793] [com.apple.WebKit:ResourceLoadStatistics] Failed to request known fingerprinting scripts from WebPrivacy: Error Domain=WebPrivacyErrorDomain Code=1001 "List data not found" UserInfo={NSLocalizedDescription=List data not found}
+2026-11-25 10:40:10.084 E  Simpl Courses[20323:e793] [com.apple.WebKit:ResourceLoadStatistics] Failed to request storage access user agent string quirks from WebPrivacy.
+2026-11-25 10:40:10.394 Df Simpl Courses[20323:e793] [com.apple.WebKit:Loading] 0x102062818 - [pageProxyID=99, webPageID=100, PID=20340] WebPageProxy::decidePolicyForNavigationAction: frameID=8589934593, isMainFrame=1, navigationID=105
+2026-11-25 10:40:10.399 A  Simpl Courses[20323:e7a8] (CoreFoundation) Loading Preferences From User Session CFPrefsD
+2026-11-25 10:40:10.400 Df Simpl Courses[20323:e7a8] [com.apple.xpc:connection] [0x101119f10] activating connection: mach=true listener=false peer=false name=com.apple.Safari.SafeBrowsing.Service
+2026-11-25 10:40:10.403 Df Simpl Courses[20323:e82c] [com.apple.WebKit:RemoteLayerBuffers] WebContent[20340]: [renderingBackend=11] Created rendering backend for pageProxyID=99, webPageID=100
+2026-11-25 10:40:10.404 Df Simpl Courses[20323:e82c] [com.apple.WebKit:Process] WebContent[20340] GPUProcessConnection::create - 0x10c0db1e0
+2026-11-25 10:40:10.404 Df Simpl Courses[20323:e793] [com.apple.WebKit:AppSSO] 0x1110ac0f0 - SOAuthorizationCoordinator::tryAuthorize
+2026-11-25 10:40:10.421 A  Simpl Courses[20323:e793] (AppSSO) canPerformAuthorizationWithURL
+2026-11-25 10:40:10.423 A  Simpl Courses[20323:e793] (AppSSOCore) canPerformAuthorizationWithURL
+2026-11-25 10:40:10.426 Df Simpl Courses[20323:e793] [com.apple.authkit:nto] Fetching native takeover URLs
+2026-11-25 10:40:10.428 Df Simpl Courses[20323:e793] [com.apple.xpc:connection] [0x10111a550] activating connection: mach=true listener=false peer=false name=com.apple.ak.authorizationservices.xpc
+2026-11-25 10:40:10.428 E  Simpl Courses[20323:e793] [com.apple.WebKit:ResourceLoadStatistics] Failed to request query parameters from WebPrivacy.
+2026-11-25 10:40:10.429 Df Simpl Courses[20323:e793] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Data/Application/8A8194C1-5615-4C71-986F-6297C115D456/tmp/com.simplcourses.app/WebKit/MediaCache'
+2026-11-25 10:40:10.429 Df Simpl Courses[20323:e793] [com.apple.WebKit:Sandbox] Successfully created a sandbox extension for '/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Data/Application/8A8194C1-5615-4C71-986F-6297C115D456/Library/WebKit/com.simplcourses.app/WebsiteData/MediaKeys/v1'
+2026-11-25 10:40:10.429 Df Simpl Courses[20323:e793] [com.apple.WebKit:ProcessSuspension] 0x1111101e0 - GPUProcessProxy is taking a background assertion because a web process is requesting a connection
+2026-11-25 10:40:10.470 Df akd[2622:31a2] [com.apple.authkit:siwa] Daemon service initialized with client: Simpl Courses (20323)
+2026-11-25 10:40:10.476 Df Simpl Courses[20323:e7d9] [com.apple.authkit:nto] URL shouldn't be processed
+2026-11-25 10:40:10.477 Df Simpl Courses[20323:e7d9] [com.apple.AppSSO:SOConfigurationClient] -[SOConfigurationClient init]  on <SOConfigurationClient: 0x600000279e40>
+2026-11-25 10:40:10.478 Df Simpl Courses[20323:e7d9] [com.apple.xpc:connection] [0x101113010] activating connection: mach=true listener=false peer=false name=com.apple.AppSSO.service-xpc
+2026-11-25 10:40:10.478 Df Simpl Courses[20323:e7d9] [com.apple.AppSSO:SOServiceConnection] <SOServiceConnection: 0x600000279f40>: new XPC connection
+2026-11-25 10:40:10.479 Df Simpl Courses[20323:e7d9] [com.apple.AppSSO:SOConfigurationClient] -[SOConfigurationClient _reloadConfig]  on <SOConfigurationClient: 0x600000279e40>
+2026-11-25 10:40:10.479 Df Simpl Courses[20323:e7d9] [com.apple.AppSSO:SOClient] -[SOClient configurationWithCompletion:]  on <SOClient: 0x60000000dfc0>
+2026-11-25 10:40:10.527 Df Simpl Courses[20323:e7d9] [com.apple.AppSSO:SOClient] configurationWithCompletion: success = YES, error = (null)
+2026-11-25 10:40:10.528 Df Simpl Courses[20323:e793] [com.apple.WebKit:AppSSO] SOAuthorizationCoordinator::tryAuthorize: The requested URL is not registered for AppSSO handling. No further action needed.
+2026-11-25 10:40:10.528 Df Simpl Courses[20323:e793] [com.apple.WebKit:Loading] 0x102062818 - [pageProxyID=99, webPageID=100, PID=20340] WebPageProxy::decidePolicyForNavigationAction: listener called: frameID=8589934593, isMainFrame=1, navigationID=105, policyAction=Use, isAppBoundDomain=0, wasNavigationIntercepted=0
+2026-11-25 10:40:10.529 Df Simpl Courses[20323:e793] [com.apple.WebKit:Loading] 0x102062818 - [pageProxyID=99, webPageID=100, PID=20340] WebPageProxy::receivedNavigationActionPolicyDecision: frameID=8589934593, isMainFrame=1, navigationID=105, policyAction=Use
+2026-11-25 10:40:10.552 Df Simpl Courses[20323:e793] [com.apple.WebKit:ProcessSwapping] 0x102062818 - [pageProxyID=99, webPageID=100, PID=20340] WebPageProxy::decidePolicyForNavigationAction: keep using process 20340 for navigation, reason=Process has not yet committed any provisional loads
+2026-11-25 10:40:10.552 Df Simpl Courses[20323:e793] [com.apple.WebKit:Process] 0x1110c80c0 - [PID=20340] WebProcessProxy::canTerminateAuxiliaryProcess: returns false (pageCount=1, provisionalPageCount=0, suspendedPageCount=0, m_isInProcessCache=0, m_shutdownPreventingScopeCounter=0)
+2026-11-25 10:40:10.566 Df Simpl Courses[20323:e793] [com.apple.WebKit:Process] 0x1111101e0 - GPUProcessProxy::didCreateContextForVisibilityPropagation: webPageProxyID: 99, pagePID: 100, contextID: 3
+2026-11-25 10:40:10.566 Df Simpl Courses[20323:e793] [com.apple.WebKit:Process] Created visibility propagation interaction <_UIVisibilityPropagationInteraction: 0x60000260b4e0> for process with PID=20341
+2026-11-25 10:40:10.583 Df Simpl Courses[20323:e82c] [com.apple.WebKit:Network] WebContent[20340]: [webFrameID=8589934593, webPageID=100] WebFrameLoaderClient::dispatchDecidePolicyForNavigationAction: Got policyAction Use from async IPC
+2026-11-25 10:40:10.583 Df Simpl Courses[20323:e82c] [com.apple.WebKit:Loading] WebContent[20340] 0x10c07c7e0 - [pageID=100, frameID=8589934593] PolicyChecker::checkNavigationPolicy: continuing because this policyAction from dispatchDecidePolicyForNavigationAction is Use
+2026-11-25 10:40:10.583 Df Simpl Courses[20323:e82c] [com.apple.WebKit:ResourceLoading] WebContent[20340]: [pageID=100 frameID=8589934593 isMainFrame=1] FrameLoader::stopAllLoaders: m_provisionalDocumentLoader=0, m_documentLoader=4513898496
+2026-11-25 10:40:10.583 Df Simpl Courses[20323:e82c] [com.apple.WebKit:Network] WebContent[20340]: [pageID=100, frameID=8589934593, isMainFrame=1] DocumentLoader::stopLoading
+2026-11-25 10:40:10.583 Df Simpl Courses[20323:e82c] [com.apple.WebKit:ResourceLoading] WebContent[20340]: [pageID=100 frameID=8589934593 isMainFrame=1] FrameLoader::setProvisionalDocumentLoader: Setting provisional document loader to 4513886208 (was 0)
+2026-11-25 10:40:10.583 Df Simpl Courses[20323:e82c] [com.apple.WebKit:ResourceLoading] WebContent[20340]: [pageID=100 frameID=8589934593 isMainFrame=1] FrameLoader::continueLoadAfterNavigationPolicy: Setting provisional document loader (m_provisionalDocumentLoader=4513886208)
+2026-11-25 10:40:10.583 Df Simpl Courses[20323:e82c] [com.apple.WebKit:ProcessSuspension] WebContent[20340]: [webPageID=100] WebPage::freezeLayerTree: Adding a reason to freeze layer tree (reason=1, new=1, old=0)
+2026-11-25 10:40:10.583 Df Simpl Courses[20323:e82c] [com.apple.WebKit:ResourceLoading] WebContent[20340]: [pageID=100 frameID=8589934593 isMainFrame=1] FrameLoader::setPolicyDocumentLoader: Setting policy document loader to 0 (was 4513886208)
+2026-11-25 10:40:10.583 Df Simpl Courses[20323:e82c] [com.apple.WebKit:ResourceLoading] WebContent[20340]: [pageID=100 frameID=8589934593 isMainFrame=1] FrameLoader::prepareForLoadStart: Starting frame load
+2026-11-25 10:40:10.584 Df Simpl Courses[20323:e82c] [com.apple.WebKit:Network] WebContent[20340]: ProgressTracker::progressStarted: frameID 8589934593, value 0.100000, tracked frames 1, originating frameID 8589934593, isMainLoad 1
+2026-11-25 10:40:10.584 Df Simpl Courses[20323:e82c] [com.apple.WebKit:Network] WebContent[20340]: [pageID=100, frameID=8589934593, isMainFrame=1] DocumentLoader::startLoadingMainResource: Starting load
+2026-11-25 10:40:10.585 Df Simpl Courses[20323:e793] [com.apple.WebKit:Loading] 0x102062818 - [pageProxyID=99, webPageID=100, PID=20340] WebPageProxy::didStartProvisionalLoadForFrame: frameID=8589934593, isMainFrame=1
+2026-11-25 10:40:10.585 Df Simpl Courses[20323:e793] [com.apple.WebKit:Loading] 0x1110c80c0 - [PID=20340] WebProcessProxy::didStartProvisionalLoadForMainFrame:
+2026-11-25 10:40:10.596 E  Simpl Courses[20323:e82c] [com.apple.WebKit:ResourceLoadStatistics] WebContent[20340] Unable to filter tracking query parameters (missing data)
+2026-11-25 10:40:10.602 Df Simpl Courses[20323:e82c] [com.apple.WebKit:Network] WebContent[20340]: [pageID=100, frameID=8589934593, resourceID=18] ResourceLoader::willSendRequestInternal: calling completion handler
+2026-11-25 10:40:10.602 Df Simpl Courses[20323:e82c] [com.apple.WebKit:ResourceLoading] WebContent[20340]: [pageID=100, frameID=8589934593, resourceID=18 SubResourceLoader::willSendRequestInternal: resource load finished; calling completion handler
+2026-11-25 10:40:10.602 Df Simpl Courses[20323:e82c] [com.apple.WebKit:Network] WebContent[20340]: [webPageID=100, frameID=100, resourceID=100] WebLoaderStrategy::scheduleLoad: URL will be scheduled with the NetworkProcess
+2026-11-25 10:40:10.603 Df Simpl Courses[20323:e82c] [com.apple.WebKit:Network] WebContent[20340]: [webPageID=100, frameID=100, resourceID=100] WebLoaderStrategy::scheduleLoad: Resource is being scheduled with the NetworkProcess (priority=4, existingNetworkResourceLoadIdentifierToResume=0)
+2026-11-25 10:40:10.603 Df Simpl Courses[20323:e82c] [com.apple.WebKit:Network] WebContent[20340]: [webPageID=100, frameID=8589934593, resourceID=18] WebResourceLoader::WebResourceLoader
+2026-11-25 10:40:10.610 Df Simpl Courses[20323:e82c] [com.apple.WebKit:Process] WebContent[20340] 0x10c0db1e0 - GPUProcessConnection::didInitialize
+2026-11-25 10:40:10.612 Df Simpl Courses[20323:e82c] [com.apple.Accessibility:AXCommon] WebContent[20340] Read Per-App on Init: Smart invert = (null)
+2026-11-25 10:40:11.363 Df Simpl Courses[20323:e793] [com.apple.WebKit:RemoteLayerTree] RemoteLayerTreeDrawingAreaProxy(102) Unhiding layer tree
+2026-11-25 10:40:12.005 Df Simpl Courses[20323:e793] [com.apple.WebKit:ResourceLoadStatistics] StorageAccessPromptQuirkController::didUpdateCachedListData: Loaded 1 storage access prompt(s) quirks from WebPrivacy.
+2026-11-25 10:40:12.288 A  Simpl Courses[20323:e793] (libsystem_containermanager.dylib) container_system_group_path_for_identifier
+2026-11-25 10:40:12.288 Df Simpl Courses[20323:e793] [com.apple.containermanager:xpc] Requesting container lookup; class = 13, identifier = com.apple.nsurlsessiond, group_identifier = systemgroup.com.apple.nsurlstoragedresources, create = 1, temp = 0, euid = 501, uid = 501
+2026-11-25 10:40:12.288 A  Simpl Courses[20323:e793] (libsystem_containermanager.dylib) container_query_t
+2026-11-25 10:40:12.288 Df Simpl Courses[20323:e793] [com.apple.containermanager:xpc] Query; euid = 501, uid = 501, class = 13, identifier = [com.apple.nsurlsessiond](1), flags = 900000003
+2026-11-25 10:40:12.290 Df Simpl Courses[20323:e793] [com.apple.containermanager:unspecified] _container_query_get_result_at_index: success
+2026-11-25 10:40:12.290 A  Simpl Courses[20323:e793] (libsystem_containermanager.dylib) container_copy_object
+2026-11-25 10:40:12.291 Df Simpl Courses[20323:e793] [com.apple.containermanager:unspecified] container_system_group_path_for_identifier: success
+2026-11-25 10:40:14.118 Df Simpl Courses[20323:e793] [com.apple.KeyboardArbiter:Client] RX sceneBecameFocused:(null)
+2026-11-25 10:40:14.405 Df Simpl Courses[20323:e7d9] [com.apple.Safari.SafeBrowsing:Database] Service did finish database update with protection type 1 and provider 1
+2026-11-25 10:40:14.405 Df Simpl Courses[20323:e7d9] [com.apple.Safari.SafeBrowsing:Database] Service did finish database update with protection type 1 and provider 1
+2026-11-25 10:40:17.828 Df Simpl Courses[20323:e82c] [com.apple.WebKit:Network] WebContent[20340]: [webPageID=100, frameID=8589934593, resourceID=18] WebResourceLoader::didReceiveResponse: (httpStatusCode=200)
+2026-11-25 10:40:20.065 A  Simpl Courses[20323:e793] (Security) SecItemDelete_ios
+2026-11-25 10:40:20.065 Df securityd[2536:2e0b] [com.apple.securityd:SecError] Simpl Courses[20323]/1#-1 LF=0 delete Error Domain=NSOSStatusErrorDomain Code=-34018 "Client has neither application-identifier nor keychain-access-groups entitlements" UserInfo={numberOfErrorsDeep=0, NSDescription=Client has neither application-identifier nor keychain-access-groups entitlements}
+2026-11-25 10:40:20.065 A  Simpl Courses[20323:e793] (Security) SecItemAdd_ios
+2026-11-25 10:40:20.066 Df securityd[2536:2e0b] [com.apple.securityd:SecError] Simpl Courses[20323]/1#-1 LF=0 add Error Domain=NSOSStatusErrorDomain Code=-34018 "Client has neither application-identifier nor keychain-access-groups entitlements" UserInfo={numberOfErrorsDeep=0, NSDescription=Client has neither application-identifier nor keychain-access-groups entitlements}
+2026-11-25 10:40:22.965 Df runningboardd[2389:db8f] [com.apple.runningboard:job_oversize] 'E50BD724-C012-4EC1-BA16-308A355F31D6' Submitting extension overlay (host PID 2533, path /Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Bundle/Application/76ABBBE3-F9BE-4E75-8F8D-3ACC54164C11/Simpl Courses.app/PlugIns/SimplWidgets.appex/SimplWidgets):
+<dictionary: 0x6000026422e0> { count = 2, transaction: 0, voucher = 0x0, contents =
+	"XPCService" => <dictionary: 0x6000026419e0> { count = 16, transaction: 0, voucher = 0x0, contents =
+		"_ManagedBy" => <string: 0x600000c7ba50> { string cache = 0x0, length = 22, contents = "com.apple.runningboard" }
+		"RunLoopType" => <string: 0x600000c78960> { string cache = 0x0, length = 9, contents = "NSRunLoop" }
+		"Platform" => <int64: 0x86087fb7c13ce50f>: 7
+		"JoinExistingSession" => <bool: 0x1e5760410>: false
+		"_SandboxProfile" => <string: 0x600000c79650> { string cache = 0x0, length = 6, contents = "plugin" }
+		"_LaunchWatchdogTimeOut" => <int64: 0x86087fb7c13ce537>: 0
+		"_AdditionalSubServices" => <dictionary: 0x6000026404e0> { count = 1, transaction: 0, voucher = 0x0, contents =
+			"xpc-session" => <bool: 0x1e57603f0>: true
+		}
+		"_ProcessType" => <string: 0x600000c78510> { string cache = 0x0, length = 8, contents = "AppNonUI" }
+		"_AdditionalProperties" => <dictionary: 0x6000026416e0> { count = 1, transaction: 0, voucher = 0x0, contents =
+			"RunningBoard" => <dictionary: 0x600002642b80> { count = 3, transaction: 0, voucher = 0x0, contents =
+				"RunningBoardLaunchedIdentity" => <dictionary: 0x600002642820> { count = 6, transaction: 0, voucher = 0x0, contents =
+					"TYPE" => <int64: 0x86087fb7c13ce517>: 4
+					"v" => <data: 0x600001765fc0>: { length = 87 bytes, contents = 0x7b226164646974696f6e616c456e7669726f6e6d656e7456... }
+					"h" => <int64: 0x86087fb7c13caa1f>: 2533
+					"i" => <string: 0x600000c78e70> { string cache = 0x0, length = 28, contents = "com.simplcourses.app.widgets" }
+					"r" => <int64: 0x86087fb7c13ce527>: 2
+					"H" => <dictionary: 0x6000026431e0> { count = 4, transaction: 0, voucher = 0x0, contents =
+						"l" => <string: 0x600000c784b0> { string cache = 0x0, length = 17, contents = "com.apple.chronod" }
+						"t" => <int64: 0x86087fb7c13ce527>: 2
+						"TYPE" => <int64: 0x86087fb7c13ce507>: 6
+						"p" => <int64: 0x86087fb7c13ce537>: 0
+					}
+				}
+				"RunningBoardLaunched" => <bool: 0x1e57603f0>: true
+				"LaunchRequestEndpointIdentifiers" => <dictionary: 0x6000026402a0> { count = 2, transaction: 0, voucher = 0x0, contents =
+					"com.simplcourses.app.widgets.xpc-session" => <bool: 0x1e57603f0>: true
+					"com.simplcourses.app.widgets" => <bool: 0x1e57603f0>: true
+				}
+			}
+		}
+		"EnvironmentVariables" => <dictionary: 0x600002640420> { count = 2, transaction: 0, voucher = 0x0, contents =
+			"EXTENSION_KIT_EXTENSION_TYPE" => <string: 0x600000c79500> { string cache = 0x0, length = 1, contents = "1" }
+			"BSServiceDomains" => <string: 0x600000c790e0> { string cache = 0x0, length = 46, contents = "{"XPCService":{"Services":{"MainService":{}}}}" }
+		}
+		"_OmitSandboxParameters" => <bool: 0x1e5760410>: false
+		"_AbandonCoalition" => <bool: 0x1e57603f0>: true
+		"_MultipleInstances" => <bool: 0x1e57603f0>: true
+		"ServiceType" => <string: 0x600000c79dd0> { string cache = 0x0, length = 11, contents = "Application" }
+		"ProgramArguments" => <array: 0x600000c79680> { count = 3, capacity = 8, contents =
+			0: <string: 0x600000c795c0> { string cache = 0x0, length = 220, contents = "/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Bundle/Application/76ABBBE3-F9BE-4E75-8F8D-3ACC54164C11/Simpl Courses.app/PlugIns/SimplWidgets.appex/SimplWidgets" }
+			1: <string: 0x600000c78ae0> { string cache = 0x0, length = 16, contents = "-LaunchArguments" }
+			2: <string: 0x600000c7a790> { string cache = 0x0, length = 108, contents = "eyJlbmhhbmNlZFNlY3VyaXR5IjpmYWxzZSwic2VydmljZU5hbWUiOiJjb20uc2ltcGxjb3Vyc2VzLmFwcC53aWRnZXRzIiwidHlwZSI6MX0=" }
+		}
+		"_ManagedBy_Services" => <array: 0x600000c7acd0> { count = 2, capacity = 8, contents =
+			0: <string: 0x600000c7bb40> { string cache = 0x0, length = 28, contents = "com.simplcourses.app.widgets" }
+			1: <string: 0x600000c7bfc0> { string cache = 0x0, length = 40, contents = "com.simplcourses.app.widgets.xpc-session" }
+		}
+	}
+	"CFBundlePackageType" => <string: 0x600000c7a490> { string cache = 0x0, length = 4, contents = "XPC!" }
+}
+2026-11-25 10:40:24.129 Df runningboardd[2389:e794] [com.apple.runningboard:job_oversize] 'E50BD724-C012-4EC1-BA16-308A355F31D6' Submitting extension overlay (host PID 2533, path /Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Bundle/Application/76ABBBE3-F9BE-4E75-8F8D-3ACC54164C11/Simpl Courses.app/PlugIns/SimplWidgets.appex/SimplWidgets):
+<dictionary: 0x60000264a760> { count = 2, transaction: 0, voucher = 0x0, contents =
+	"XPCService" => <dictionary: 0x60000264a940> { count = 16, transaction: 0, voucher = 0x0, contents =
+		"_ManagedBy" => <string: 0x600000c5a3a0> { string cache = 0x0, length = 22, contents = "com.apple.runningboard" }
+		"RunLoopType" => <string: 0x600000c58210> { string cache = 0x0, length = 9, contents = "NSRunLoop" }
+		"Platform" => <int64: 0x86087fb7c13ce50f>: 7
+		"JoinExistingSession" => <bool: 0x1e5760410>: false
+		"_SandboxProfile" => <string: 0x600000c59ec0> { string cache = 0x0, length = 6, contents = "plugin" }
+		"_LaunchWatchdogTimeOut" => <int64: 0x86087fb7c13ce537>: 0
+		"_AdditionalSubServices" => <dictionary: 0x60000264a7c0> { count = 1, transaction: 0, voucher = 0x0, contents =
+			"xpc-session" => <bool: 0x1e57603f0>: true
+		}
+		"_ProcessType" => <string: 0x600000c5bed0> { string cache = 0x0, length = 8, contents = "AppNonUI" }
+		"_AdditionalProperties" => <dictionary: 0x60000264ad00> { count = 1, transaction: 0, voucher = 0x0, contents =
+			"RunningBoard" => <dictionary: 0x60000264a9a0> { count = 3, transaction: 0, voucher = 0x0, contents =
+				"RunningBoardLaunchedIdentity" => <dictionary: 0x60000264b600> { count = 6, transaction: 0, voucher = 0x0, contents =
+					"TYPE" => <int64: 0x86087fb7c13ce517>: 4
+					"v" => <data: 0x60000178c540>: { length = 87 bytes, contents = 0x7b226164646974696f6e616c456e7669726f6e6d656e7456... }
+					"h" => <int64: 0x86087fb7c13caa1f>: 2533
+					"i" => <string: 0x600000c5b330> { string cache = 0x0, length = 28, contents = "com.simplcourses.app.widgets" }
+					"r" => <int64: 0x86087fb7c13ce527>: 2
+					"H" => <dictionary: 0x60000264a580> { count = 4, transaction: 0, voucher = 0x0, contents =
+						"l" => <string: 0x600000c5ab80> { string cache = 0x0, length = 17, contents = "com.apple.chronod" }
+						"t" => <int64: 0x86087fb7c13ce527>: 2
+						"TYPE" => <int64: 0x86087fb7c13ce507>: 6
+						"p" => <int64: 0x86087fb7c13ce537>: 0
+					}
+				}
+				"RunningBoardLaunched" => <bool: 0x1e57603f0>: true
+				"LaunchRequestEndpointIdentifiers" => <dictionary: 0x60000264b480> { count = 2, transaction: 0, voucher = 0x0, contents =
+					"com.simplcourses.app.widgets.xpc-session" => <bool: 0x1e57603f0>: true
+					"com.simplcourses.app.widgets" => <bool: 0x1e57603f0>: true
+				}
+			}
+		}
+		"EnvironmentVariables" => <dictionary: 0x600002649ec0> { count = 2, transaction: 0, voucher = 0x0, contents =
+			"EXTENSION_KIT_EXTENSION_TYPE" => <string: 0x600000c59c50> { string cache = 0x0, length = 1, contents = "1" }
+			"BSServiceDomains" => <string: 0x600000c5b5a0> { string cache = 0x0, length = 46, contents = "{"XPCService":{"Services":{"MainService":{}}}}" }
+		}
+		"_OmitSandboxParameters" => <bool: 0x1e5760410>: false
+		"_AbandonCoalition" => <bool: 0x1e57603f0>: true
+		"_MultipleInstances" => <bool: 0x1e57603f0>: true
+		"ServiceType" => <string: 0x600000c58900> { string cache = 0x0, length = 11, contents = "Application" }
+		"ProgramArguments" => <array: 0x600000c59a40> { count = 3, capacity = 8, contents =
+			0: <string: 0x600000c599e0> { string cache = 0x0, length = 220, contents = "/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Bundle/Application/76ABBBE3-F9BE-4E75-8F8D-3ACC54164C11/Simpl Courses.app/PlugIns/SimplWidgets.appex/SimplWidgets" }
+			1: <string: 0x600000c595f0> { string cache = 0x0, length = 16, contents = "-LaunchArguments" }
+			2: <string: 0x600000c5ba80> { string cache = 0x0, length = 108, contents = "eyJzZXJ2aWNlTmFtZSI6ImNvbS5zaW1wbGNvdXJzZXMuYXBwLndpZGdldHMiLCJ0eXBlIjoxLCJlbmhhbmNlZFNlY3VyaXR5IjpmYWxzZX0=" }
+		}
+		"_ManagedBy_Services" => <array: 0x600000c591d0> { count = 2, capacity = 8, contents =
+			0: <string: 0x600000c5b1b0> { string cache = 0x0, length = 28, contents = "com.simplcourses.app.widgets" }
+			1: <string: 0x600000c58a80> { string cache = 0x0, length = 40, contents = "com.simplcourses.app.widgets.xpc-session" }
+		}
+	}
+	"CFBundlePackageType" => <string: 0x600000c58450> { string cache = 0x0, length = 4, contents = "XPC!" }
+}
+2026-11-25 10:40:24.385 Df SimplWidgets[20497:ea4d] [com.apple.extensionkit:default] Extension `/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Bundle/Application/76ABBBE3-F9BE-4E75-8F8D-3ACC54164C11/Simpl Courses.app/PlugIns/SimplWidgets.appex/SimplWidgets` of type: `1` launched.
+2026-11-25 10:40:24.399 Df SimplWidgets[20497:ea4d] [com.apple.extensionkit:launch] Extension Type: 'service' : <ExtensionFoundation._EXRunningExtension: 0x600002c08000>
+2026-11-25 10:40:24.399 Df SimplWidgets[20497:ea4d] [com.apple.runningboard:connection] Initializing connection
+2026-11-25 10:40:24.400 Df SimplWidgets[20497:ea4d] [com.apple.runningboard:process] Removing all cached process handles
+2026-11-25 10:40:24.400 Df SimplWidgets[20497:ea90] [com.apple.runningboard:connection] Sending handshake request attempt #1 to server
+2026-11-25 10:40:24.400 Df SimplWidgets[20497:ea90] [com.apple.runningboard:connection] Creating connection to com.apple.runningboard
+2026-11-25 10:40:24.400 Df SimplWidgets[20497:ea90] [com.apple.xpc:connection] [0x104f06300] activating connection: mach=true listener=false peer=false name=com.apple.runningboard
+2026-11-25 10:40:24.406 Df SimplWidgets[20497:ea90] [com.apple.runningboard:connection] Handshake succeeded
+2026-11-25 10:40:24.406 Df SimplWidgets[20497:ea90] [com.apple.runningboard:connection] Identity resolved as xpcservice<com.simplcourses.app.widgets([osservice<com.apple.chronod>:2533])>{vt hash: 166798169}[uuid:E50BD724-C012-4EC1-BA16-308A355F31D6]{definition:com.simplcourses.app.widgets[extension][client]}
+2026-11-25 10:40:24.411 Df SimplWidgets[20497:ea4d] [com.apple.xpc:connection] [0x105804a00] activating connection: mach=true listener=false peer=false name=com.apple.lsd.mapdb
+2026-11-25 10:40:24.414 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] main [WidgetBundle]
+2026-11-25 10:40:24.416 Df SimplWidgets[20497:ea4d] [com.apple.xpc:connection] [0x105806370] activating connection: mach=true listener=false peer=false name=com.apple.cfprefsd.daemon
+2026-11-25 10:40:24.420 A  SimplWidgets[20497:ea4d] (CoreFoundation) Loading Preferences From User Session CFPrefsD
+2026-11-25 10:40:24.420 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Locale token: aSHSfDpaK2Xr+O03r4oPJj3ufh0=
+2026-11-25 10:40:24.427 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] WidgetHost - Optional(WidgetKit.ResolvedWidgetBundleHost)
+2026-11-25 10:40:24.433 Df SimplWidgets[20497:ea4d] [com.apple.xpc:connection] [0x1058072e0] readying connection: mach=false listener=true peer=false name=com.simplcourses.app.widgets
+2026-11-25 10:40:24.441 Df SimplWidgets[20497:ea4d] [com.apple.BoardServices:Bootstrap] initializing domain XPCService
+2026-11-25 10:40:24.441 Df SimplWidgets[20497:ea4d] [com.apple.xpc:connection] [0x1058072e0] activating connection: mach=false listener=true peer=false name=com.simplcourses.app.widgets
+2026-11-25 10:40:24.442 Df SimplWidgets[20497:ea90] [com.apple.BoardServices:XPCErrors] [S:1] Alloc XPCServiceListener:20497:com.simplcourses.app.widgets:E50BD724-C012-4EC1-BA16-308A355F31D6
+2026-11-25 10:40:24.442 Df SimplWidgets[20497:ea90] [com.apple.xpc:connection] [0x1059056b0] activating connection: mach=false listener=false peer=true name=com.simplcourses.app.widgets.peer[2533].0x1059056b0
+2026-11-25 10:40:24.462 Df SimplWidgets[20497:ea90] [com.apple.chrono:widget] =+= getAllCurrentDescriptors(completion:) - locale: en_US (fixed en_US)
+2026-11-25 10:40:24.487 Df SimplWidgets[20497:ea4d] (libMobileGestalt.dylib) No persisted cache on this platform.
+2026-11-25 10:40:24.679 Df Simpl Courses[20323:e7d8] [com.apple.xpc:connection] [0x100d2e920] activating connection: mach=true listener=false peer=false name=com.apple.metrickit.xpc
+2026-11-25 10:40:24.679 Df launchd_sim[2298:e8f7] [user/501:] failed lookup: name = com.apple.metrickit.xpc, requestor = Simpl Courses[20323], error = 3: No such process
+2026-11-25 10:40:24.954 Df runningboardd[2389:2d79] [com.apple.runningboard:job_oversize] 'E50BD724-C012-4EC1-BA16-308A355F31D6' Submitting extension overlay (host PID 2533, path /Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Bundle/Application/76ABBBE3-F9BE-4E75-8F8D-3ACC54164C11/Simpl Courses.app/PlugIns/SimplWidgets.appex/SimplWidgets):
+<dictionary: 0x60000264a9a0> { count = 2, transaction: 0, voucher = 0x0, contents =
+	"XPCService" => <dictionary: 0x60000264bc00> { count = 16, transaction: 0, voucher = 0x0, contents =
+		"_ManagedBy" => <string: 0x600000c5bde0> { string cache = 0x0, length = 22, contents = "com.apple.runningboard" }
+		"RunLoopType" => <string: 0x600000c59f20> { string cache = 0x0, length = 9, contents = "NSRunLoop" }
+		"Platform" => <int64: 0x86087fb7c13ce50f>: 7
+		"JoinExistingSession" => <bool: 0x1e5760410>: false
+		"_SandboxProfile" => <string: 0x600000c5ab80> { string cache = 0x0, length = 6, contents = "plugin" }
+		"_LaunchWatchdogTimeOut" => <int64: 0x86087fb7c13ce537>: 0
+		"_AdditionalSubServices" => <dictionary: 0x600002649ce0> { count = 1, transaction: 0, voucher = 0x0, contents =
+			"xpc-session" => <bool: 0x1e57603f0>: true
+		}
+		"_ProcessType" => <string: 0x600000c59a40> { string cache = 0x0, length = 8, contents = "AppNonUI" }
+		"_AdditionalProperties" => <dictionary: 0x60000264b120> { count = 1, transaction: 0, voucher = 0x0, contents =
+			"RunningBoard" => <dictionary: 0x60000264abe0> { count = 3, transaction: 0, voucher = 0x0, contents =
+				"RunningBoardLaunchedIdentity" => <dictionary: 0x60000264b480> { count = 6, transaction: 0, voucher = 0x0, contents =
+					"TYPE" => <int64: 0x86087fb7c13ce517>: 4
+					"v" => <data: 0x600001773ec0>: { length = 87 bytes, contents = 0x7b226164646974696f6e616c456e7669726f6e6d656e7456... }
+					"h" => <int64: 0x86087fb7c13caa1f>: 2533
+					"i" => <string: 0x600000c5aa90> { string cache = 0x0, length = 28, contents = "com.simplcourses.app.widgets" }
+					"r" => <int64: 0x86087fb7c13ce527>: 2
+					"H" => <dictionary: 0x60000264a160> { count = 4, transaction: 0, voucher = 0x0, contents =
+						"l" => <string: 0x600000c5bba0> { string cache = 0x0, length = 17, contents = "com.apple.chronod" }
+						"t" => <int64: 0x86087fb7c13ce527>: 2
+						"TYPE" => <int64: 0x86087fb7c13ce507>: 6
+						"p" => <int64: 0x86087fb7c13ce537>: 0
+					}
+				}
+				"RunningBoardLaunched" => <bool: 0x1e57603f0>: true
+				"LaunchRequestEndpointIdentifiers" => <dictionary: 0x60000264ae20> { count = 2, transaction: 0, voucher = 0x0, contents =
+					"com.simplcourses.app.widgets.xpc-session" => <bool: 0x1e57603f0>: true
+					"com.simplcourses.app.widgets" => <bool: 0x1e57603f0>: true
+				}
+			}
+		}
+		"EnvironmentVariables" => <dictionary: 0x60000264a580> { count = 2, transaction: 0, voucher = 0x0, contents =
+			"EXTENSION_KIT_EXTENSION_TYPE" => <string: 0x600000c588a0> { string cache = 0x0, length = 1, contents = "1" }
+			"BSServiceDomains" => <string: 0x600000c5b840> { string cache = 0x0, length = 46, contents = "{"XPCService":{"Services":{"MainService":{}}}}" }
+		}
+		"_OmitSandboxParameters" => <bool: 0x1e5760410>: false
+		"_AbandonCoalition" => <bool: 0x1e57603f0>: true
+		"_MultipleInstances" => <bool: 0x1e57603f0>: true
+		"ServiceType" => <string: 0x600000c5a160> { string cache = 0x0, length = 11, contents = "Application" }
+		"ProgramArguments" => <array: 0x600000c58210> { count = 3, capacity = 8, contents =
+			0: <string: 0x600000c596e0> { string cache = 0x0, length = 220, contents = "/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Bundle/Application/76ABBBE3-F9BE-4E75-8F8D-3ACC54164C11/Simpl Courses.app/PlugIns/SimplWidgets.appex/SimplWidgets" }
+			1: <string: 0x600000c58f60> { string cache = 0x0, length = 16, contents = "-LaunchArguments" }
+			2: <string: 0x600000c5a220> { string cache = 0x0, length = 108, contents = "eyJzZXJ2aWNlTmFtZSI6ImNvbS5zaW1wbGNvdXJzZXMuYXBwLndpZGdldHMiLCJ0eXBlIjoxLCJlbmhhbmNlZFNlY3VyaXR5IjpmYWxzZX0=" }
+		}
+		"_ManagedBy_Services" => <array: 0x600000c586f0> { count = 2, capacity = 8, contents =
+			0: <string: 0x600000c5b7b0> { string cache = 0x0, length = 28, contents = "com.simplcourses.app.widgets" }
+			1: <string: 0x600000c599e0> { string cache = 0x0, length = 40, contents = "com.simplcourses.app.widgets.xpc-session" }
+		}
+	}
+	"CFBundlePackageType" => <string: 0x600000c5aac0> { string cache = 0x0, length = 4, contents = "XPC!" }
+}
+2026-11-25 10:40:25.118 Df SimplWidgets[20497:ea91] [com.apple.chrono:placeholder] Batch begin (pl-f886f2) - locale: en_US (fixed en_US)
+2026-11-25 10:40:25.187 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request began for SimplGrades:accessoryRectangular - to archive: /Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/tmp/com.apple.chrono/NSIRD_chronod_fTKGM4/accessoryRectangular----162.00w-72.00h-0.00r-tw0N5Ubrzh67JnTcbyMa8gRaBPsvEXdUc4wO04hotJo=.chrono-timeline
+2026-11-25 10:40:25.217 Df SimplWidgets[20497:ea91] [com.apple.BoardServices:XPCErrors] [C:2] Alloc com.apple.frontboard.systemappservices
+2026-11-25 10:40:25.217 Df SimplWidgets[20497:ea91] [com.apple.xpc:connection] [0x105805990] activating connection: mach=false listener=false peer=false name=(anonymous)
+2026-11-25 10:40:25.247 Df SimplWidgets[20497:ea4d] [com.apple.UIKit:UIScreen] Evaluated capturing state as 0 on <UIScreen: 0x105808810> for initial
+2026-11-25 10:40:25.247 Df SimplWidgets[20497:ea4d] [com.apple.UIKit:UIScreen] Evaluated capturing state as 0 on <UIScreen: 0x105808810> for CADisplay KVO
+2026-11-25 10:40:25.252 Df SimplWidgets[20497:ea4d] [com.apple.Accessibility:AXSupportCommon] Read CategoryName: per-app = 1, category name = (null)
+2026-11-25 10:40:25.253 Df SimplWidgets[20497:ea4d] [com.apple.Accessibility:AXSupportCommon] Read CategoryName: per-app = 0, category name = (null)
+2026-11-25 10:40:25.285 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Archive deployment version: DeploymentVersion(base: SwiftUI.ArchivedViewInput.DeploymentVersion(rawValue: 2))
+2026-11-25 10:40:25.328 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:25.451 Df SimplWidgets[20497:ea91] [com.apple.xpc:connection] [0x104f0a9b0] activating connection: mach=true listener=false peer=false name=com.apple.fontservicesd
+2026-11-25 10:40:25.997 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.012 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.063 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.217 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request ended for SimplGrades:accessoryRectangular - success.
+2026-11-25 10:40:26.219 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request began for SimplGrades:systemSmall - to archive: /Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/tmp/com.apple.chrono/NSIRD_chronod_1xBDwF/systemSmall----362.00w-362.00h-61.54r-Tn6sO9CitMMwhKHLblDHDpkaeW#5YIIyMlalJkwBIzU=.chrono-timeline
+2026-11-25 10:40:26.237 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Archive deployment version: DeploymentVersion(base: SwiftUI.ArchivedViewInput.DeploymentVersion(rawValue: 2))
+2026-11-25 10:40:26.240 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.289 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.291 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.312 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.322 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.327 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.333 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.336 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.339 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.364 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.382 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.389 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request ended for SimplGrades:systemSmall - success.
+2026-11-25 10:40:26.389 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request began for SimplGrades:accessoryCircular - to archive: /Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/tmp/com.apple.chrono/NSIRD_chronod_z4niJs/accessoryCircular----72.00w-72.00h-36.00r-tw0N5Ubrzh67JnTcbyMa8gRaBPsvEXdUc4wO04hotJo=.chrono-timeline
+2026-11-25 10:40:26.390 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Archive deployment version: DeploymentVersion(base: SwiftUI.ArchivedViewInput.DeploymentVersion(rawValue: 2))
+2026-11-25 10:40:26.391 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.463 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.471 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.475 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.481 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request ended for SimplGrades:accessoryCircular - success.
+2026-11-25 10:40:26.481 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request began for SimplGrades:systemMedium - to archive: /Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/tmp/com.apple.chrono/NSIRD_chronod_Uaw7ol/systemMedium----349.67w-164.33h-27.94r-1VTNgEwDUstZ1uS6fX0#4whja22jdasM+9uwBap5KvY=.chrono-timeline
+2026-11-25 10:40:26.484 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Archive deployment version: DeploymentVersion(base: SwiftUI.ArchivedViewInput.DeploymentVersion(rawValue: 2))
+2026-11-25 10:40:26.485 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.727 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.766 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.766 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.769 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.806 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.837 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.842 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.884 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request ended for SimplGrades:systemMedium - success.
+2026-11-25 10:40:26.884 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request began for SimplGrades:systemSmall - to archive: /Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/tmp/com.apple.chrono/NSIRD_chronod_SwbueJ/systemSmall----164.33w-164.33h-27.94r-1VTNgEwDUstZ1uS6fX0#4whja22jdasM+9uwBap5KvY=.chrono-timeline
+2026-11-25 10:40:26.885 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Archive deployment version: DeploymentVersion(base: SwiftUI.ArchivedViewInput.DeploymentVersion(rawValue: 2))
+2026-11-25 10:40:26.888 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.899 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.910 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.915 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.965 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:26.974 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:27.048 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:27.054 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:27.063 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:27.074 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:27.080 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request ended for SimplGrades:systemSmall - success.
+2026-11-25 10:40:27.080 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request began for SimplGrades:accessoryInline - to archive: /Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/tmp/com.apple.chrono/NSIRD_chronod_Pa3WCr/accessoryInline----342.00w--36.00h--0.00r--0f--0.00t-0.00l-0.00b0.00t.chrono-timeline
+2026-11-25 10:40:27.080 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Archive deployment version: DeploymentVersion(base: SwiftUI.ArchivedViewInput.DeploymentVersion(rawValue: 2))
+2026-11-25 10:40:27.081 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:27.150 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:27.176 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:27.185 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:27.252 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request ended for SimplGrades:accessoryInline - success.
+2026-11-25 10:40:27.254 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Batch ended (pl-f886f2) - success
+2026-11-25 10:40:27.261 Df SimplWidgets[20497:ea4d] [com.apple.BackBoard:Display] [FBSDisplaySource 1-1] silently connecting raw configuration: <FBSDisplayConfiguration: 0x600003d041e0; Main; mode: "402x874@3x 60Hz p3 SDR">
+2026-11-25 10:40:27.404 Df runningboardd[2389:2d79] [com.apple.runningboard:job_oversize] 'E50BD724-C012-4EC1-BA16-308A355F31D6' Submitting extension overlay (host PID 2533, path /Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Bundle/Application/76ABBBE3-F9BE-4E75-8F8D-3ACC54164C11/Simpl Courses.app/PlugIns/SimplWidgets.appex/SimplWidgets):
+<dictionary: 0x600002638780> { count = 2, transaction: 0, voucher = 0x0, contents =
+	"XPCService" => <dictionary: 0x60000263b5a0> { count = 16, transaction: 0, voucher = 0x0, contents =
+		"_ManagedBy" => <string: 0x600000c47300> { string cache = 0x0, length = 22, contents = "com.apple.runningboard" }
+		"RunLoopType" => <string: 0x600000c44600> { string cache = 0x0, length = 9, contents = "NSRunLoop" }
+		"Platform" => <int64: 0x86087fb7c13ce50f>: 7
+		"JoinExistingSession" => <bool: 0x1e5760410>: false
+		"_SandboxProfile" => <string: 0x600000c443c0> { string cache = 0x0, length = 6, contents = "plugin" }
+		"_LaunchWatchdogTimeOut" => <int64: 0x86087fb7c13ce537>: 0
+		"_AdditionalSubServices" => <dictionary: 0x60000263b540> { count = 1, transaction: 0, voucher = 0x0, contents =
+			"xpc-session" => <bool: 0x1e57603f0>: true
+		}
+		"_ProcessType" => <string: 0x600000c47d20> { string cache = 0x0, length = 8, contents = "AppNonUI" }
+		"_AdditionalProperties" => <dictionary: 0x6000026385a0> { count = 1, transaction: 0, voucher = 0x0, contents =
+			"RunningBoard" => <dictionary: 0x6000026396e0> { count = 3, transaction: 0, voucher = 0x0, contents =
+				"RunningBoardLaunchedIdentity" => <dictionary: 0x600002638900> { count = 6, transaction: 0, voucher = 0x0, contents =
+					"TYPE" => <int64: 0x86087fb7c13ce517>: 4
+					"v" => <data: 0x60000175d280>: { length = 87 bytes, contents = 0x7b226164646974696f6e616c456e7669726f6e6d656e7456... }
+					"h" => <int64: 0x86087fb7c13caa1f>: 2533
+					"i" => <string: 0x600000c45530> { string cache = 0x0, length = 28, contents = "com.simplcourses.app.widgets" }
+					"r" => <int64: 0x86087fb7c13ce527>: 2
+					"H" => <dictionary: 0x600002639c80> { count = 4, transaction: 0, voucher = 0x0, contents =
+						"l" => <string: 0x600000c452f0> { string cache = 0x0, length = 17, contents = "com.apple.chronod" }
+						"t" => <int64: 0x86087fb7c13ce527>: 2
+						"TYPE" => <int64: 0x86087fb7c13ce507>: 6
+						"p" => <int64: 0x86087fb7c13ce537>: 0
+					}
+				}
+				"RunningBoardLaunched" => <bool: 0x1e57603f0>: true
+				"LaunchRequestEndpointIdentifiers" => <dictionary: 0x600002639aa0> { count = 2, transaction: 0, voucher = 0x0, contents =
+					"com.simplcourses.app.widgets.xpc-session" => <bool: 0x1e57603f0>: true
+					"com.simplcourses.app.widgets" => <bool: 0x1e57603f0>: true
+				}
+			}
+		}
+		"EnvironmentVariables" => <dictionary: 0x60000263ad00> { count = 2, transaction: 0, voucher = 0x0, contents =
+			"EXTENSION_KIT_EXTENSION_TYPE" => <string: 0x600000c444b0> { string cache = 0x0, length = 1, contents = "1" }
+			"BSServiceDomains" => <string: 0x600000c44420> { string cache = 0x0, length = 46, contents = "{"XPCService":{"Services":{"MainService":{}}}}" }
+		}
+		"_OmitSandboxParameters" => <bool: 0x1e5760410>: false
+		"_AbandonCoalition" => <bool: 0x1e57603f0>: true
+		"_MultipleInstances" => <bool: 0x1e57603f0>: true
+		"ServiceType" => <string: 0x600000c44540> { string cache = 0x0, length = 11, contents = "Application" }
+		"ProgramArguments" => <array: 0x600000c44510> { count = 3, capacity = 8, contents =
+			0: <string: 0x600000c46160> { string cache = 0x0, length = 220, contents = "/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Bundle/Application/76ABBBE3-F9BE-4E75-8F8D-3ACC54164C11/Simpl Courses.app/PlugIns/SimplWidgets.appex/SimplWidgets" }
+			1: <string: 0x600000c45f50> { string cache = 0x0, length = 16, contents = "-LaunchArguments" }
+			2: <string: 0x600000c46dc0> { string cache = 0x0, length = 108, contents = "eyJzZXJ2aWNlTmFtZSI6ImNvbS5zaW1wbGNvdXJzZXMuYXBwLndpZGdldHMiLCJ0eXBlIjoxLCJlbmhhbmNlZFNlY3VyaXR5IjpmYWxzZX0=" }
+		}
+		"_ManagedBy_Services" => <array: 0x600000c44210> { count = 2, capacity = 8, contents =
+			0: <string: 0x600000c45380> { string cache = 0x0, length = 28, contents = "com.simplcourses.app.widgets" }
+			1: <string: 0x600000c46e80> { string cache = 0x0, length = 40, contents = "com.simplcourses.app.widgets.xpc-session" }
+		}
+	}
+	"CFBundlePackageType" => <string: 0x600000c46b20> { string cache = 0x0, length = 4, contents = "XPC!" }
+}
+2026-11-25 10:40:27.551 Df SimplWidgets[20497:ea90] [com.apple.chrono:placeholder] Batch begin (pl-b7fc71) - locale: en_US (fixed en_US)
+2026-11-25 10:40:27.552 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request began for SimplUpNext:systemSmall - to archive: /Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/tmp/com.apple.chrono/NSIRD_chronod_p8rkvi/systemSmall----164.33w-164.33h-27.94r-1VTNgEwDUstZ1uS6fX0#4whja22jdasM+9uwBap5KvY=.chrono-timeline
+2026-11-25 10:40:27.554 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Archive deployment version: DeploymentVersion(base: SwiftUI.ArchivedViewInput.DeploymentVersion(rawValue: 2))
+2026-11-25 10:40:27.555 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:27.882 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:27.924 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:27.932 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:27.941 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:27.950 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:27.963 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:27.979 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:27.982 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:27.988 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.000 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request ended for SimplUpNext:systemSmall - success.
+2026-11-25 10:40:28.000 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request began for SimplUpNext:systemSmall - to archive: /Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/tmp/com.apple.chrono/NSIRD_chronod_xdLfdH/systemSmall----362.00w-362.00h-61.54r-Tn6sO9CitMMwhKHLblDHDpkaeW#5YIIyMlalJkwBIzU=.chrono-timeline
+2026-11-25 10:40:28.010 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Archive deployment version: DeploymentVersion(base: SwiftUI.ArchivedViewInput.DeploymentVersion(rawValue: 2))
+2026-11-25 10:40:28.011 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.033 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.060 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.060 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.061 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.083 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.214 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.453 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.578 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.579 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.653 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.744 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.774 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.786 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request ended for SimplUpNext:systemSmall - success.
+2026-11-25 10:40:28.787 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request began for SimplUpNext:accessoryInline - to archive: /Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/tmp/com.apple.chrono/NSIRD_chronod_uz2OFE/accessoryInline----342.00w--36.00h--0.00r--0f--0.00t-0.00l-0.00b0.00t.chrono-timeline
+2026-11-25 10:40:28.787 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Archive deployment version: DeploymentVersion(base: SwiftUI.ArchivedViewInput.DeploymentVersion(rawValue: 2))
+2026-11-25 10:40:28.788 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.823 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.838 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.847 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.858 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request ended for SimplUpNext:accessoryInline - success.
+2026-11-25 10:40:28.859 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request began for SimplUpNext:accessoryRectangular - to archive: /Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/tmp/com.apple.chrono/NSIRD_chronod_UGgvXp/accessoryRectangular----162.00w-72.00h-0.00r-tw0N5Ubrzh67JnTcbyMa8gRaBPsvEXdUc4wO04hotJo=.chrono-timeline
+2026-11-25 10:40:28.876 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Archive deployment version: DeploymentVersion(base: SwiftUI.ArchivedViewInput.DeploymentVersion(rawValue: 2))
+2026-11-25 10:40:28.878 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.888 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.896 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.902 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.909 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request ended for SimplUpNext:accessoryRectangular - success.
+2026-11-25 10:40:28.909 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request began for SimplUpNext:accessoryCircular - to archive: /Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/tmp/com.apple.chrono/NSIRD_chronod_dXDb1R/accessoryCircular----72.00w-72.00h-36.00r-tw0N5Ubrzh67JnTcbyMa8gRaBPsvEXdUc4wO04hotJo=.chrono-timeline
+2026-11-25 10:40:28.911 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Archive deployment version: DeploymentVersion(base: SwiftUI.ArchivedViewInput.DeploymentVersion(rawValue: 2))
+2026-11-25 10:40:28.912 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.922 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.927 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.932 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.935 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request ended for SimplUpNext:accessoryCircular - success.
+2026-11-25 10:40:28.935 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request began for SimplUpNext:systemMedium - to archive: /Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/tmp/com.apple.chrono/NSIRD_chronod_C2fQpK/systemMedium----349.67w-164.33h-27.94r-1VTNgEwDUstZ1uS6fX0#4whja22jdasM+9uwBap5KvY=.chrono-timeline
+2026-11-25 10:40:28.936 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Archive deployment version: DeploymentVersion(base: SwiftUI.ArchivedViewInput.DeploymentVersion(rawValue: 2))
+2026-11-25 10:40:28.937 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.953 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.957 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.970 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.982 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.985 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:28.995 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request ended for SimplUpNext:systemMedium - success.
+2026-11-25 10:40:28.995 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request began for SimplGrades:accessoryInline - to archive: /Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/tmp/com.apple.chrono/NSIRD_chronod_7VKvXL/accessoryInline----342.00w--36.00h--0.00r--0f--0.00t-0.00l-0.00b0.00t.chrono-timeline
+2026-11-25 10:40:28.996 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Archive deployment version: DeploymentVersion(base: SwiftUI.ArchivedViewInput.DeploymentVersion(rawValue: 2))
+2026-11-25 10:40:28.997 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.001 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.003 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.007 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.012 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request ended for SimplGrades:accessoryInline - success.
+2026-11-25 10:40:29.012 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request began for SimplGrades:accessoryRectangular - to archive: /Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/tmp/com.apple.chrono/NSIRD_chronod_EDuW4I/accessoryRectangular----162.00w-72.00h-0.00r-tw0N5Ubrzh67JnTcbyMa8gRaBPsvEXdUc4wO04hotJo=.chrono-timeline
+2026-11-25 10:40:29.013 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Archive deployment version: DeploymentVersion(base: SwiftUI.ArchivedViewInput.DeploymentVersion(rawValue: 2))
+2026-11-25 10:40:29.014 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.037 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.046 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.052 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.066 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request ended for SimplGrades:accessoryRectangular - success.
+2026-11-25 10:40:29.066 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request began for SimplGrades:accessoryCircular - to archive: /Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/tmp/com.apple.chrono/NSIRD_chronod_L0oMh5/accessoryCircular----72.00w-72.00h-36.00r-tw0N5Ubrzh67JnTcbyMa8gRaBPsvEXdUc4wO04hotJo=.chrono-timeline
+2026-11-25 10:40:29.067 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Archive deployment version: DeploymentVersion(base: SwiftUI.ArchivedViewInput.DeploymentVersion(rawValue: 2))
+2026-11-25 10:40:29.068 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.103 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.116 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.125 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.139 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request ended for SimplGrades:accessoryCircular - success.
+2026-11-25 10:40:29.140 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request began for SimplGrades:systemSmall - to archive: /Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/tmp/com.apple.chrono/NSIRD_chronod_o9k4q1/systemSmall----362.00w-362.00h-61.54r-Tn6sO9CitMMwhKHLblDHDpkaeW#5YIIyMlalJkwBIzU=.chrono-timeline
+2026-11-25 10:40:29.141 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Archive deployment version: DeploymentVersion(base: SwiftUI.ArchivedViewInput.DeploymentVersion(rawValue: 2))
+2026-11-25 10:40:29.145 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.152 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.158 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.170 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.172 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.211 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.214 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.219 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.223 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.224 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.233 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request ended for SimplGrades:systemSmall - success.
+2026-11-25 10:40:29.234 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request began for SimplGrades:systemSmall - to archive: /Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/tmp/com.apple.chrono/NSIRD_chronod_MlhWuK/systemSmall----164.33w-164.33h-27.94r-1VTNgEwDUstZ1uS6fX0#4whja22jdasM+9uwBap5KvY=.chrono-timeline
+2026-11-25 10:40:29.235 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Archive deployment version: DeploymentVersion(base: SwiftUI.ArchivedViewInput.DeploymentVersion(rawValue: 2))
+2026-11-25 10:40:29.236 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.240 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.250 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.257 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.260 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.265 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.269 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.278 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.281 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.288 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.290 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request ended for SimplGrades:systemSmall - success.
+2026-11-25 10:40:29.290 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request began for SimplGrades:systemMedium - to archive: /Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/tmp/com.apple.chrono/NSIRD_chronod_nhkb2z/systemMedium----349.67w-164.33h-27.94r-1VTNgEwDUstZ1uS6fX0#4whja22jdasM+9uwBap5KvY=.chrono-timeline
+2026-11-25 10:40:29.291 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Archive deployment version: DeploymentVersion(base: SwiftUI.ArchivedViewInput.DeploymentVersion(rawValue: 2))
+2026-11-25 10:40:29.293 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.305 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.314 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.317 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.339 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.350 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.352 Df SimplWidgets[20497:ea4d] [com.apple.chrono:widget] Supports content layers? true, archiveVersion=3
+2026-11-25 10:40:29.382 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Request ended for SimplGrades:systemMedium - success.
+2026-11-25 10:40:29.383 Df SimplWidgets[20497:ea4d] [com.apple.chrono:placeholder] Batch ended (pl-b7fc71) - success
+2026-11-25 10:40:29.767 Df log[20658:0] [com.apple.log:] log run noninteractively, parent: 2298 (launchd_sim), args: 'log' 'show' '--last' '2m' '--style' 'compact' '--predicate' 'process CONTAINS "Simpl" OR eventMessage CONTAINS "Simpl Courses"'
