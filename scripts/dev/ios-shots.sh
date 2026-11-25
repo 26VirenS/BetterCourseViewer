@@ -50,6 +50,37 @@ launch() {
   echo "$name $((SECONDS - t0))s $how" >> "$OUT/shot-times.txt"
 }
 
+# tour <prefix> [args…]: (iPhone 1.9, build 72) the tour after the first setup, gone through by the app itself
+# (-SimplTour drive: Native/Tour.swift) — each step pictured as the app says it is showing, with its ring placed
+# ("tour: shot <name>", then two seconds before the step is done for it), until "tour: done" (two minutes at most).
+# A tour that does not finish is said in tour.txt with its last lines.
+tour() {
+  local prefix="$1"
+  shift
+  local log="$OUT/console-$prefix-tour.txt" seen=0 t0=$SECONDS
+  xcrun simctl terminate booted "$BID" >/dev/null 2>&1 || true
+  sleep 0.5
+  xcrun simctl launch --console-pty booted "$BID" -SimplBaseURL "${BASE:-http://localhost:8800}" -setupOpened YES -SimplDemo YES -SimplTour drive "$@" > "$log" 2>&1 &
+  while [ $((SECONDS - t0)) -lt 120 ]; do
+    local names
+    names=$(grep -o "tour: shot [a-z0-9-]*" "$log" 2>/dev/null | awk '{print $3}')
+    local n
+    n=$(printf '%s\n' "$names" | grep -c .)
+    while [ "$seen" -lt "$n" ]; do
+      seen=$((seen + 1))
+      local name
+      name="$prefix-tour-$(printf '%02d' "$seen")-$(printf '%s\n' "$names" | sed -n "${seen}p")"
+      xcrun simctl io booted screenshot "$OUT/$name.png" >/dev/null 2>&1 && echo "shot $name" || echo "no shot $name"
+      echo "$name $((SECONDS - t0))s tour" >> "$OUT/shot-times.txt"
+    done
+    grep -q "tour: done" "$log" 2>/dev/null && break
+    sleep 0.25
+  done
+  if ! grep -q "tour: done" "$log"; then
+    { echo "tour $prefix: DID NOT FINISH — last lines:"; tail -30 "$log"; } | tee -a "$OUT/tour.txt"
+  fi
+}
+
 # the app's crash reports and its own log lines, kept with the pictures (a picture of the home screen is an app
 # that did not stay up: these say why)
 collect() {
@@ -99,6 +130,8 @@ for mode in light dark; do
   launch "$mode-21-setup" 18 -SimplOpen setup
   # (1.4.3) Settings, all of it the phone's own rows: the look, grades, the record, data
   launch "$mode-22-settings" 18 -SimplOpen settings
+  # (1.9, build 72) the tour after the first setup, step by step
+  tour "$mode"
   # (1.6.1) the first run: the school searched for by name
   launch "$mode-23-school" 12 -SimplPicker merced
 done
@@ -154,6 +187,7 @@ if [ -n "$WIDE" ]; then
   launch wide-04-grades 16 -SimplTab grades $WARGS
   launch wide-10-assignment 22 -SimplTab todo -SimplPush /courses/101/assignments/1001 $WARGS
   launch wide-11-grades-sheet 20 -SimplTab grades -SimplOpen grades:101 $WARGS
+  tour wide $WARGS # (build 72: one column — the courses as cards)
   # the Duo on its side: two columns
   launch wide-l-01-today 18 $LARGS
   launch wide-l-03-todo 16 -SimplTab todo $LARGS
@@ -164,6 +198,7 @@ if [ -n "$WIDE" ]; then
   launch wide-l-02-courses 16 -SimplTab courses $LARGS
   launch wide-l-09-course 20 -SimplTab courses -SimplPush /courses/101 $LARGS
   launch wide-l-17-inbox 18 -SimplPush /conversations $LARGS
+  tour wide-l $LARGS # (build 72: two columns — Switch Course)
   # (iPhone 1.8.1, build 43) folded and opened again and again on each tab, something opened on the way: the app must
   # stay up through it and say "fold cycle: done" (NativeShell.foldCycle)
   # (the cycle takes about 45 seconds once the app's screens are up, which can itself take 40 on a slow simulator: up to

@@ -27,7 +27,7 @@ struct TodayView: View {
                 ColumnList(refresh: { await load(force: true) }) {
                     Section {
                         LazyVGrid(columns: columns, spacing: 10) {
-                            ForEach(d.counters) { c in counterTile(c) }
+                            ForEach(d.counters) { c in counterTile(c, first: c.key == d.counters.first?.key) }
                         }
                         .listRowInsets(EdgeInsets())
                         .listRowBackground(Color.clear)
@@ -88,6 +88,10 @@ struct TodayView: View {
         .modifier(TitleSubtitle(text: data?.dateLine))
         .shellToolbar(bell: true)
         .task(id: engine.dataVersion) { await load() }
+        // (build 72) the tour opening the first counter itself
+        .onReceive(NotificationCenter.default.publisher(for: .simplTourOpenCard)) { _ in
+            if let c = data?.counters.first { sheet = SheetKey(id: c.key) }
+        }
         .sheet(item: $sheet) { key in
             ItemsSheet(key: key.id) { url in
                 sheet = nil
@@ -97,7 +101,7 @@ struct TodayView: View {
         }
     }
 
-    private func counterTile(_ c: Counter) -> some View {
+    private func counterTile(_ c: Counter, first: Bool) -> some View {
         let value: Int? = c.key == "overdue" ? counts?.overdue : c.key == "graded" ? counts?.graded : c.value
         let red = c.tone == "red" && (value ?? 0) > 0
         return Button {
@@ -125,6 +129,7 @@ struct TodayView: View {
             .padding(.vertical, 12)
             .contentCard(cornerRadius: 20, tint: red ? .red : nil)
             .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background { if first { Color.clear.tourTarget(.card) } } // (build 72: the tour's first ring)
         }
         .buttonStyle(PressScale())
         .animation(.snappy, value: value)
@@ -338,7 +343,7 @@ struct ItemsSheet: View {
             .navigationTitle(data?.title ?? "")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() }.tourTarget(.sheetDone) }
             }
             .modifier(SheetNote(note: data?.note, title: data?.title ?? "", width: sheetWidth)) // (1.9: what the list is, in the bar across from Done)
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { sheetWidth = $0 }
@@ -347,6 +352,10 @@ struct ItemsSheet: View {
         .presentationContentInteraction(.resizes)
         .presentationDragIndicator(.visible)
         .task { await load() }
+        // (build 72) the tour waits for the list to be up, then closed
+        .onAppear { Tour.shared.sheet(true) }
+        .onDisappear { Tour.shared.sheet(false) }
+        .onReceive(NotificationCenter.default.publisher(for: .simplTourCloseSheet)) { _ in dismiss() }
     }
 
     private func load() async {

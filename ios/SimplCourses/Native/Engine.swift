@@ -458,11 +458,14 @@ final class Engine: ObservableObject, ShellListener {
         WidgetFeeder.shared.refresh(self) // (1.9: the widgets, from what Canvas says now)
         Task { await Reminders.shared.reschedule(self) } // (each launch: the reminders set again from what Canvas says now)
         Task { await Activity.shared.sync(self) } // (and what the stream holds now is seen: the app is showing it)
-        // the first run: the iPhone's own setup (the courses that count, the goals), before anything else
+        // the first run: the iPhone's own setup (the courses that count, the goals), before anything else — and (build 72)
+        // the tour after it
+        if snapshot?.setupDone == false { Tour.shared.setupShown() }
         if snapshot?.setupDone == false || LaunchOpen.take("setup") != nil {
             queuePopup(.setup)
             return
         }
+        Tour.shared.launched(self) // (build 72: a tour left unfinished begins again; the simulator suite's, -SimplTour)
         Task { await NotificationAsk.afterSetup(self, delay: 4) } // (a setup made before this one asks, once)
         // after an update: what changed (seen once its sheet is really up — a sign-in still under way only delays it)
         if let wn = try? await call("whatsNew", ["due": true, "peek": true], as: WhatsNewData.self), !wn.releases.isEmpty {
@@ -572,6 +575,9 @@ final class Engine: ObservableObject, ShellListener {
     private var popupFree: Bool {
         phase == .native && !web.webView.isLoading && web.login.settled && !setup && whatsNew == nil && quiz == nil && tool == nil && !settingsOpen && !searchOpen
     }
+
+    /// (Build 72) Free for the tour after the first setup: as for a popup.
+    var calm: Bool { popupFree }
 
     /// Looked at again in a moment (a popup going away, the sign-in moving on), and again until the next one is up.
     func schedulePopups(after delay: Double = 0.7) {

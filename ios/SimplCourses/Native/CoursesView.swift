@@ -16,6 +16,8 @@ struct CoursesView: View {
     @Environment(\.splitList) private var splitList
     /// (iPhone 1.8.1) The cards' own width: 750 points or more (the Duo on its side), a column each side of the fold.
     @State private var room: CGFloat = 0
+    /// (Build 72) The tour after the first setup: its rings round the first two courses.
+    @ObservedObject private var tour = Tour.shared
 
     var body: some View {
         Group {
@@ -25,9 +27,10 @@ struct CoursesView: View {
                 List {
                     Section {
                         if d.rows.isEmpty { Text(d.empty ?? "No courses selected.").foregroundStyle(.secondary) }
-                        ForEach(d.rows) { c in
+                        ForEach(Array(d.rows.enumerated()), id: \.element.id) { i, c in
                             Button { open(c) } label: { row(c) }
                                 .buttonStyle(.plain)
+                                .listRowBackground(tour.step != nil && i < 2 ? TourCell(index: i, id: c.id) : nil) // (build 72: where the row is, for the tour)
                                 .swipeActions {
                                     Button { startNaming(c) } label: { Label("Nickname", systemImage: "pencil") }.tint(.indigo)
                                 }
@@ -56,6 +59,7 @@ struct CoursesView: View {
                 .accessibilityLabel("Choose Courses")
         ))
         .task(id: engine.dataVersion) { await load() }
+        .onChange(of: data?.rows.count, initial: true) { _, n in if let n { Tour.shared.courses(n) } }
         .sheet(isPresented: $choosing) {
             CoursePickerSheet()
                 .environmentObject(engine)
@@ -104,15 +108,15 @@ struct CoursesView: View {
                 if room >= 750 {
                     // (1.8.1) a column each side of the fold, the cards across both in order — never one on the crease
                     FoldSplit {
-                        VStack(spacing: 14) { ForEach(Array(d.rows.enumerated()).filter { $0.offset % 2 == 0 }.map(\.element)) { c in card(c) } }
+                        VStack(spacing: 14) { ForEach(Array(d.rows.enumerated()).filter { $0.offset % 2 == 0 }, id: \.element.id) { c in card(c.element, index: c.offset) } }
                             .padding(.trailing, foldGutter)
                     } right: {
-                        VStack(spacing: 14) { ForEach(Array(d.rows.enumerated()).filter { $0.offset % 2 == 1 }.map(\.element)) { c in card(c) } }
+                        VStack(spacing: 14) { ForEach(Array(d.rows.enumerated()).filter { $0.offset % 2 == 1 }, id: \.element.id) { c in card(c.element, index: c.offset) } }
                             .padding(.leading, foldGutter)
                     }
                 } else {
                     LazyVGrid(columns: wideColumns(minimum: 260), spacing: 14) {
-                        ForEach(d.rows) { c in card(c) }
+                        ForEach(Array(d.rows.enumerated()), id: \.element.id) { c in card(c.element, index: c.offset) }
                     }
                 }
                 if let hidden = d.hidden, !hidden.isEmpty {
@@ -130,7 +134,7 @@ struct CoursesView: View {
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { room = $0 }
     }
 
-    private func card(_ c: CourseRow) -> some View {
+    private func card(_ c: CourseRow, index: Int) -> some View {
         Button { open(c) } label: {
             row(c)
                 .padding(.horizontal, 16)
@@ -138,6 +142,7 @@ struct CoursesView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
                 .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .tourTarget(.course(index), id: c.id) // (build 72: where the card is, for the tour)
         }
         .buttonStyle(.plain)
         .contextMenu { menu(c) }
